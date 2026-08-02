@@ -1,0 +1,182 @@
+canvas#mapCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.selected {
+    border: 0.2rem solid #0f0;
+    box-shadow: 0 0 1rem #0f0;
+}
+#tileContainer {
+    user-select: none;
+    grid-area: sidebar;
+    border: 0.2rem solid #fff;
+    background: #00000033;
+    z-index: 1;
+
+    color: #676767;
+    border-color: #676767;
+}
+body {
+    margin: 0;
+    display: grid;
+    grid-template-columns: 3fr 8fr 2fr;
+    grid-template-rows: 1fr 8fr;
+    grid-template-areas: 
+    "sidebar instructions notes"
+    ". . notes";
+    height: 100vh;
+}
+#buttonContainer {
+    position: fixed;
+    display: flex;
+    bottom: 1rem;
+    left: 1rem;
+    gap: 1rem;
+    z-index: 1;
+    width: 50rem;
+    height: 3rem;
+}
+#saveButton {
+    z-index: 2;
+    
+}
+#saveMapButton {
+    z-index: 2;
+    
+}
+#saveJSONButton {
+    z-index: 2;
+}
+#loadJSONButton {
+    z-index: 2;
+}
+button {
+    background: #ffffff;
+    border: 0.2rem solid #676767;
+    color: #676767;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: transform 0.1s ease-in-out, background 0.1s ease-in-out, color 0.1s ease-in-out;
+}
+button:hover {
+    background: #676767;
+    color: #ffffff;
+    transform: scale(1.02);
+}
+button:active {
+    background: #000000;
+    color: #ffffff;
+    transform: scale(0.98);
+}
+.tile{
+    transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out, border 0.1s ease-in-out;
+}
+.tile:hover {
+    transform: scale(1.05);
+}
+.tile:active {
+    transform: scale(0.95);
+}
+#instructions {
+    grid-area: instructions;
+    z-index: 1;
+    font-family: Arial, Helvetica, sans-serif;
+    text-align: start;
+    color: #ffffff;
+    background: #2b2b2bBB;
+    border: 0.2rem solid #676767;
+    margin: 1rem;
+    box-sizing: border-box;
+}
+#notes {
+    grid-area: notes;
+    margin: 1rem;
+
+    box-sizing: border-box;
+
+    background: #99866e;
+    border: 0.5rem solid #664c2e;
+
+    display: flex;
+    flex-direction: column;
+
+    z-index: 1;
+    overflow: hidden;
+}
+
+#notes header {
+    padding: 0.5rem;
+
+    background: #664c2e;
+    color: #f5ead7;
+
+    font-weight: bold;
+    text-align: center;
+}
+
+#notes main {
+    flex: 1;
+
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    padding: 0.75rem;
+}
+
+.noteControls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+#notes button {
+    flex: 1;
+
+    padding: 0.4rem;
+
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+
+    background: #c7ad8a;
+    color: #332416;
+
+    cursor: pointer;
+}
+
+#notes button:hover {
+    background: #dbc09a;
+}
+
+#noteInput {
+    width: 100%;
+    flex: 1;
+
+    min-height: 8rem;
+
+    padding: 0.6rem;
+
+    box-sizing: border-box;
+
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+
+    background: #f3e6cf;
+    color: #332416;
+
+    font-size: 1rem;
+    font-family: inherit;
+
+    resize: vertical;
+
+    line-height: 1.4;
+}
+
+#noteInput:focus {
+    outline: none;
+    border-color: #3d6b3d;
+}

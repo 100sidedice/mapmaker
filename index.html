@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Map Maker</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <canvas id="mapCanvas" width="800" height="600"></canvas>
+        <!-- tile container -->
+        <div id="buttonContainer">
+            <button id="saveButton">Save</button>
+            <button id="saveMapButton">Download Map</button>
+            <button id="saveJSONButton">Download JSON</button>
+            <button id="loadJSONButton">Load JSON</button>
+        </div>
+        <fieldset id="tileContainer">
+            <legend>Tiles</legend>
+        </fieldset>
+        <p id="instructions">
+            | This is a map maker for a 3d-printed dungeon tile system. You can get the stls using the Download STLs button below.<br>
+            | keybinds: q/e to cycle tile type, Middle-click to move, 1-9 for brush size, f to fill, ctrl for eyedropper, alt to select, ctrl+s to save, s to select area, o to outline<br>
+            | each grid cell (8x8 tiles) = 1 peice of paper<br>
+            | How to use: 3d-print mats in tpu 95A, pins in PLA. 2d-print the map. Cut them out, align on mat, use spiral pin to peirce paper, place normal pin to hold.
+        </p>
+        <aside id="notes">
+            <header>Notes</header>
+            <main>
+                <div class="noteControls">
+                    <button id="addNoteButton">Add Note</button>
+                    <button id="removeNoteButton">Remove Note</button>
+                </div>
+
+                <textarea id="noteInput" placeholder="Enter note text - select a tile [ctrl or alt] to see it's note. If you begin with a hex color code (e.g. #FFFF00), it will use that color."></textarea>
+            </main>
+        </aside>
+        <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+        <script type="module" src="script.js"></script>
+    </body>
+</html>
