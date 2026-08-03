@@ -435,7 +435,7 @@ class MapMaker extends App{
                 ctx.imageSmoothingEnabled = false;
                 for (let y = 0; y < 8; y++) {
                     for (let x = 0; x < 8; x++) {
-                        const tileType = smallMap[y][x];
+                        const tileType = smallMap[y][x][0]; // get the tile type, ignoring selected state
                         if (tileType === "") continue;
                         const img = this.images[tileType];
                         if (img) {
