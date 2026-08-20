@@ -4,7 +4,9 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Map Maker</title>
+        <link rel="stylesheet" href="tooltip.css">
         <link rel="stylesheet" href="style.css">
+        <link rel="stylesheet" href="notes.css">   
     </head>
     <body>
         <canvas id="mapCanvas" width="800" height="600"></canvas>
@@ -14,28 +16,274 @@
             <button id="saveMapButton">Download Map</button>
             <button id="saveJSONButton">Download JSON</button>
             <button id="loadJSONButton">Load JSON</button>
+            <button id="Rasterize">Rasterize regions</button>
+            <button id="clearSave">Clear Save</button>
+            <p style="display:none">Region type count: <span id="detailsBox">0</span></p>
+            <p style="display:none">Max tiles: <span id="tilesBox">16</span></p>
         </div>
         <fieldset id="tileContainer">
             <legend>Tiles</legend>
         </fieldset>
-        <p id="instructions">
-            | This is a map maker for a 3d-printed dungeon tile system. You can get the stls using the Download STLs button below.<br>
-            | keybinds: q/e to cycle tile type, Middle-click to move, 1-9 for brush size, f to fill, ctrl for eyedropper, alt to select, ctrl+s to save, s to select area, o to outline<br>
-            | each grid cell (8x8 tiles) = 1 peice of paper<br>
-            | How to use: 3d-print mats in tpu 95A, pins in PLA. 2d-print the map. Cut them out, align on mat, use spiral pin to peirce paper, place normal pin to hold.
-        </p>
-        <aside id="notes">
+        <aside id="instructions">
+            <details open>
+                <summary>Welcome!</summary>
+                <p>
+                    - This is a map maker for my 3d printed tile system for D&D. <br>
+                    - It's fully open source - do what you want, just don't sell it. I don't care.<br>
+                    - This is a Unfolding program - It's functionality increases as you learn. It will look stupid simple and weak at first. <br>
+                    - I provided a simple guided tutorial below. <br>
+                </p>
+            </details>
+            <details>
+                <summary>—The basics—</summary>
+                <p><i>~How to design a map</i></p>
+                <ul class="keybinds">
+                    <li>Left-click to draw</li>
+                    <li>Click tile in top left to select it</li>
+                    <li>The x is your eraser</li>
+                    <li>Mouse wheel to zoom</li>
+                    <li>Middle-drag to pan</li>
+                    <li>Click 'Download Map' to save your creation</li>
+                </ul>
+                <p><i>~Digital to real-world</i></p>
+                <p>
+                    Like I said in the beginning, this is for my 3d printed tile system. <br>
+                    You need a 3d printer to use it in full. <br>
+                    If you don't have one, you can still use it digitally, or simply print it out on paper. <br>
+                    <br>
+                    But for those who do, here's how to get your map into the real world: <br>
+                </p>
+                <ul>
+                    <li>First, download the map, same way as before. </li>
+                    <li>Click the 'Get STLS' button to download the STLS for your printer. </li>
+                    <li>Print the Mats in TPU (95A)</li>
+                    <li>Everything else is PLA</li>
+                    <li>Print out the tiles</li>
+                    <li>Cut them out</li>
+                    <li>Use the puncher to peirce the paper</li>
+                    <li>Then put a pin in the holes</li>
+                    <li>Everything else builds from this structure. You can even make your own if you know some basic modeling, from the base pins.</li>
+                </ul>
+            </details>
+            <details>
+                <summary>—Speeding up—</summary>
+                <p><i>"This would take ages!"</i></p>
+
+                <p>Placing tile by tile is slow - we need bigger brushes.</p>
+                <p>Starting simple...</p>
+                <ul class="keybinds">
+                    <li>Change brush size with 1-9</li>
+                </ul>
+                <p>Also, going to that top toolbar is annoying.</p>
+                <ul>
+                    <li>Right-click to erase</li>
+                    <li>Cycle item with q & e</li>
+                    <li>Ctrl to eyedrop tile</li>
+                </ul>
+                <p>Another method to place many files...</p>
+                <ul>
+                    <li>Hold shift to box-place</li>
+                    <li>Press F to fill</li>
+                </ul>
+                <p>You may have noticed that ctrl left a weird brown box... wonder what that is...</p>
+            </details>
+            <details>
+                <summary>—Taking note—</summary>
+                <p><i>~Not one google doc needed!</i></p>
+                <ul>
+                    <li>Press N to open Notes</li>
+                </ul>
+                <p>This is the notes menu!</p>
+                <p>It's a simple way to keep track of your thousands of notes.</p>
+                <p>Global notes are for general campaign notes that apply to the entire map.</p>
+                <p>There's also the Keywords section, where you can highlight important terms and add a easy popup-description or link a note page.</p>
+                <p>You can click the colors to change it's color on the map.</p>
+                <p>Eyedropping (ctrl) basically anything on the map will open a note page for it</p>
+                <p>We'll come back to notes later, once we have a better understanding of the map's structure.</p>
+            </details>
+            <details>
+                <summary>—Accelerating—</summary>
+                <p><i>~The all powerful Select tool!</i></p>
+                <ul>
+                    <li>Press s to select a tile area</li>
+                    <li>Right-click to deselect</li>
+                    <li>Press c to copy selection</li>
+                    <li>Press v to show clipboard</li>
+                    <li>Press v agian to paste <br>(right click cancels it)</li>
+                </ul>
+                <p>Note that your cursor position matters when you copy - It's copied relative to your cursor position.</p>
+                <p>However, we can do better then just selecting areas.</p>
+                <ul>
+                    <li>Hold alt to select tiles</li>
+                    <li>Press x to delete selection</li>
+                    <li>F will fill selection</li>
+                </ul>
+                <p>Works same way as before - just free-form (:</p>
+                <p>Alt is a universal modifier to select - Try holing alt + shift to select a box.</p>
+                <p>And your now placing tiles very fast! So fast in fact... it's getting really messy, and too much to make into a real, playable map...</p>
+            </details>
+            <details>
+                <summary>—Zooming out—</summary>
+                <p><i>~Litterally, zooming out.</i></p>
+                <p>What your looking at right now is Tile scope - the view of individual tiles.</p>
+                <p>But we can zoom out to see the bigger picture - Region scope.</p>
+                <ul>
+                    <li>Zoom out with the scroll wheel until it turns a green shade.</li>
+                </ul>
+                <p><strong>Welcome to Region Scope!</strong></p>
+                <p>Here, instead of placing tiles, you place regions of them.</p>
+                <ul>
+                    <li>All tile-scope tools that can, will work in region scope.</li>
+                </ul>
+                <p>Now, before we continue, I want to remind you that every tile is 1 inch in real life.</p>
+                <p>So, if you zoom out to region scope, and place a 1x1 region, that is 8x8 inches in real life.</p>
+                <p>For a size comparason, filling the screen in region mode right at the scope border is taller then you. Unless your above 8 feet in height.</p>
+                <p>So, to create massive, open wordly feel maps, we will need a way to properly scale them.</p>
+                <p>Oh, by the way, if you zoom out even further you will go into space. It's very easy to get lost in space.</p>
+            </details>
+            <details>
+                <summary>—H U G E maps—</summary>
+                <p><i>~Far too large to fit on a table</i></p>
+                <ul>
+                    <li>Place some regions, and select them.</li>
+                    <li>Then, press g to group them.</li>
+                    <li>Then, eyedrop a region in the group.</li>
+                </ul>
+                <p>You will see that all regions not in the group have been darkened.</p>
+                <p>Note that pressing g again will just randomly generate a color.</p>
+                <p>To properly add or remove from a group, you can:</p>
+                <ul>
+                    <li>Eyedrop the colored square in the top-left of a region to select it's group</li>
+                    <li>You can now choose what regions are in the group by drawing</li>
+                </ul>
+                <p>However, it is kinda hard to tell the order in which we play the map...</p>
+            </details>
+            <details>
+                <summary>—Scribbling—</summary>
+                <p><i>~Plain drawing is nice to have</i></p>
+                <ul>
+                    <li>Go into [Tile scope]</li>
+                    <li>Click a to toggle annotate mode</li>
+                    <li>Now just draw on the map</li>
+                    <li>Changing brush size changes the eraser radius</li>
+                </ul>
+                <p>And yes, eyedropping a scribble will add it to the notes. Like I said, just about anything on the map can be noted.</p>
+                <p>On the topic of notes, let's talk about how to use them to their fullest potential.</p>
+            </details>
+            <details>
+                <summary>—Fancy notes—</summary>
+                <p><i>~The all powerful note system!</i></p>
+                <p>You have a general idea of how to make maps, maybe you have played around with the note system already.</p>
+                <p>When you create a basic note on the map and start editing, you can use HTML syntax to format the text how you want.</p>
+                <p>Heres's a list of the core HTML tags you can use:</p>
+                <ul>
+                    <li>&lt;strong&gt;Bold&lt;/strong&gt;</li>
+                    <li>&lt;em&gt;Italic&lt;/em&gt;</li>
+                    <li>&lt;u&gt;Underline&lt;/u&gt;</li>
+                    <li>&lt;s&gt;Strikethrough&lt;/s&gt;</li>
+                    <li>&lt;br&gt;Line break</li>
+                    <li>&lt;a href="url"&gt;Link&lt;/a&gt;</li>
+                    <li>&lt;img src="url" alt="description"&gt;Image</li>
+                    <li>&lt;ul&gt;&lt;li&gt;List item&lt;/li&gt;&lt;/ul&gt;Unordered list</li>
+                    <li>&lt;ol&gt;&lt;li&gt;List item&lt;/li&gt;&lt;/ol&gt;Ordered list</li>
+                    <li>&lt;h1&gt;Heading 1&lt;/h1&gt; to &lt;h6&gt;Heading 6&lt;/h6&gt;</li>
+                    <li>&lt;span style="color: red;"&gt;<span style="color: red;">Color</span>&lt;/span&gt;</li>
+                    <li>&lt;span style="font-size: 18px;"&gt;<span style="font-size: 18px;">Large text</span>&lt;/span&gt;</li>
+                    <li>&lt;details&gt;&lt;summary&gt;Details&lt;/summary&gt;&lt;p&gt;More information&lt;/p&gt;&lt;/details&gt;</li>
+                </ul>
+                <p>For the most part, you will find &lt;details&gt; and &lt;h1&gt; to &lt;h6&gt; most useful for organizing information.</p>
+                <p>Like I said though, you can use any HTML tags in your notes. Including script and style tags, which can be used to add custom functionality and styling to your notes. I do not reccomend trying to generate elements dynamically with these tags, however, as it will break UI lol</p>
+                <p>Also, if you didn't know, you can find element ids/classes by right-clicking on them and selecting "Inspect" (or press F12) in your browser's developer tools.</p>
+            </details>
+            <details>
+                <summary>—Notes to notes—</summary>
+                <p><i>~The art of linking notes together</i></p>
+                <p>Say you want to link two notes together. You can do this by creating a keyword in one note that points to the other note.</p>
+                <ul>
+                    <li>Go to the Note Browser > Keywords</li>
+                    <li>Click "Add Keyword"</li>
+                    <li>Enter a keyword name and type the key for the note you want to link to in the 'goto' field</li>
+                </ul>
+                <p>Different categories of notes are specified by using different keywords.</p>
+                <ul>
+                    <li>global_Title - Global notes</li>
+                    <li>regionX_regionY - Region-specific notes</li>
+                    <li>regionX_regionY_tileX_tileY - Tile-specific notes</li>
+                    <li>group_#hex - Group notes</li>
+                    <li>scribble_# - Scribble notes</li>
+                </ul>
+            </details>
+            <details>
+                <summary>—Zooming... In?—</summary>
+                <p><i>~The final frontier</i></p>
+                <p>So, we have a map, and we have notes. But what if we want to zoom in even further? What if we want to see the individual pixels of a tile?</p>
+                <p>Well, you can do that too! If you keep zooming in, you will eventually reach pixel scope. Here, you can edit the individual pixels of a tile.</p>
+                <p>Grayscale only here - no colors since well, it's ment to be a printed medium.</p>
+                <p>You can click the + icon to add a new tile type, and click Backspace to delete the currently select one.</p>
+                <p>Warning, though. Be careful to not accidentally delete important data, editing or deleting a tile effects every instance of that tile, not just the one you're editing.</p>
+            </details>
+            <details>
+                <summary>—The end—</summary>
+                <p><i>..finally...</i></p>
+                <p>Well, that's all I have to say for now. I hope you enjoy using this map maker as much as I enjoyed making it.</p>
+                <p>For some devleopment-related stats:</p>
+                <ul>
+                    <li>Time spent: Roughly 25 hours within 3 days</li>
+                    <li>Lines of code: 6671 lines of javascript, 478 lines of css, and 289 lines of HTML</li>
+                    <li>AI usage: Almost none. I did use a bit of generative AI here and there as last-minute touch ups or debugging support (it's better at finding silly human errors) I force it to add JSDocs on any function it touches - so anywhere you see JSDocs in this code, it was modifed in some way by AI.</li>
+                </ul>
+                <p>I am Elijah Delima, known online as @100sidedice. My main website: <a href="https://100sidedice.github.io/" style="color:aqua">100sidedice.github.io</a></p>
+            </details>
+        </aside>
+        <button id="close-instructions">Close Information</button>
+        <aside id="notes" class="">
             <header>Notes</header>
             <main>
-                <div class="noteControls">
-                    <button id="addNoteButton">Add Note</button>
-                    <button id="removeNoteButton">Remove Note</button>
-                </div>
-
-                <textarea id="noteInput" placeholder="Enter note text - select a tile [ctrl or alt] to see it's note. If you begin with a hex color code (e.g. #FFFF00), it will use that color."></textarea>
+                <section class="noteControls" id="mainNoteControls">
+                    <button id="note-nothing" class="hide" tooltip="No note selected.">(:</button>
+                    <button id="note-back" class="hide" tooltip="Go back">Back</button>
+                    <button id="note-show" class="hide" tooltip="Show previous note">Back</button>
+                    <button id="note-browse" class="" tooltip="Browse notes">Browse Notes</button>
+                    <button id="note-edit" class="" tooltip="Edit note">Edit Note</button>
+                    <button id="note-edit-back" class="hide" tooltip="Go back to note display">Back</button>
+                    <button id="note-remove" class="" tooltip="Remove note">Remove Note</button>
+                    <button id="note-goto" class="hide" tooltip="Go to note">Go!</button>
+                </section>
+                <hr>
+                <section id="noteBrowser" class="area hide">
+                    <button id="note-search" tooltip="Search for a note based on it's text">Search</button>
+                    <textarea id="noteBrowserInput" placeholder="Search notes..." class="hide"></textarea>
+                    <hr>
+                    <nav id="note-browser-main">
+                        
+                    </nav>
+                </section>
+                <section id="displayAreaNote" class="last area">
+                    <div id="noteDisplay"></div>
+                </section>
+                <section id="noteEdit" class="area last hide">
+                    <fieldset class="plain">
+                        <button class="color" data-color="#ff000033" style="background-color: #ff000033;"></button>
+                        <button class="color" data-color="#00ff0033" style="background-color: #00ff0033;"></button>
+                        <button class="color" data-color="#0000ff33" style="background-color: #0000ff33;"></button>
+                        <button class="color" data-color="#ffff0033" style="background-color: #ffff0033;"></button>
+                        <button class="color" data-color="#ff00ff33" style="background-color: #ff00ff33;"></button>
+                        <button class="color" data-color="#00ffff33" style="background-color: #00ffff33;"></button>
+                        <button class="color" data-color="#ffffff33" style="background-color: #ffffff33;"></button>
+                        <button class="color" data-color="#00000033" style="background-color: #00000033;"></button>
+                        <button class="color" data-color="#80808033" style="background-color: #80808033;"></button>
+                    </fieldset>
+                    <textarea id="noteInput" placeholder="Enter note text - Pick a tile [ctrl] to see it's note. You can use HTML syntax to format the text how you want."></textarea>
+                </section>
             </main>
         </aside>
-        <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+        <div id="overlay" class="hide"></div>
+        <menu id="conformation" class="hide">
+            <h2>Are you sure?</h2>
+            <button id="confirm-yes">Yes</button>
+            <button id="confirm-no">No</button>
+        </menu>
+            <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
         <script type="module" src="script.js"></script>
     </body>
 </html>

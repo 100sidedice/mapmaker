@@ -1,0 +1,30 @@
+#tooltip {
+	position: fixed;
+	z-index: 999999;
+
+	background: #c7ad8a;
+	border: 0.15rem solid #664c2e;
+	padding: 0.4rem;
+	border-radius: 0.25rem;
+
+	color: #332416;
+	white-space: nowrap;
+	pointer-events: none;
+
+	opacity: 0;
+	visibility: hidden;
+	transform: translateX(-50%);
+
+	transition:
+		opacity 0.15s ease,
+		visibility 0s linear 0.15s;
+}
+
+#tooltip.visible {
+	opacity: 1;
+	visibility: visible;
+
+	transition:
+		opacity 0.15s ease,
+		visibility 0s linear;
+}

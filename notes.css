@@ -1,0 +1,255 @@
+#notes {
+    grid-area: notes;
+    position: sticky;
+    margin: 1rem;
+    box-sizing: border-box;
+    background: #99866e;
+    border: 0.5rem solid #664c2e;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    z-index: 1;
+    overflow: scroll;
+}
+#notes header {
+    padding: 0.5rem;
+
+    background: #664c2e;
+    color: #f5ead7;
+
+    font-weight: bold;
+    text-align: center;
+}
+
+#notes main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+}
+.last{
+    flex: 1;
+}
+
+.noteControls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+#notes button {
+    flex: 1;
+    padding: 0.4rem;
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+    background: #c7ad8a;
+    color: #332416;
+    cursor: pointer;
+}
+
+#notes button:hover {
+    background: #dbc09a;
+}
+
+#noteInput {
+    width: 100%;
+    flex: 1;
+    min-height: 8rem;
+    padding: 0.6rem;
+    box-sizing: border-box;
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+    background: #f3e6cf;
+    color: #332416;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+    line-height: 1.4;
+}
+
+#noteInput:focus {
+    outline: none;
+    border-color: #3d6b3d;
+}
+
+fieldset.plain {
+    padding: 0;
+    margin: 0;
+    border: none;
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+hr {
+    border: none;
+    border-top: 0.1rem solid #664c2e;
+    margin: 0.5rem 0 0 0;
+}
+.color {
+    width: 2rem;
+    height: 2rem;
+    border: 0.1rem solid #664c2e;
+    border-radius: 0.25rem;
+    background: #f3e6cf;
+    cursor: pointer;
+}
+section.area {
+    display: flex;
+    flex-direction: column;
+}
+/* Note display */
+#noteDisplay {
+    width: 100%;
+    flex: 1;
+    min-height: 8rem;
+    padding: 0.6rem;
+    box-sizing: border-box;
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+    background: #f3e6cf;
+    color: #332416;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+    line-height: 1.4;
+}
+
+/** Note browser */
+.selected {
+    border: 0.2rem solid #0f0;
+    box-shadow: 0 0 1rem #0f0;
+}
+nav {
+    display: flex;
+    flex-direction: column;
+    margin-top: 0.5rem;
+}
+#notes details {
+    padding: 0.5rem;
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+    background: #c7ad8a;
+    color: #332416;
+    font-size: 1rem;
+    font-family: inherit;
+    outline: none;
+}
+#notes details fieldset {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+} 
+#notes details summary {
+    cursor: pointer;
+    background: #c7ad8a;
+    border: none;
+    outline: none;
+}
+#noteBrowserInput {
+    width: 100%;
+    padding: 0.4rem;
+    box-sizing: border-box;
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+    background: #f3e6cf;
+    color: #332416;
+    font-size: 1rem;
+    font-family: inherit;
+    height: 2.5rem;
+    resize: none;
+}
+.nav-add {
+    background: #cba778 !important;
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+    color: #332416;
+    cursor: pointer;
+    padding: 0.4rem;
+    width: 100%;
+    margin: 0rem 0;
+}
+.nav-note {
+    background: #8ac7c4;
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+    color: #332416;
+    cursor: pointer;
+    padding: 0.4rem;
+    width: 100%;
+}
+.note-title {
+    width: 100%;
+    padding: 0.4rem;
+    box-sizing: border-box;
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+    background: #f3e6cf;
+    color: #332416;
+    font-size: 1rem;
+    font-family: inherit;
+    height: 2.5rem;
+    resize: none;
+}
+/*keyword feildset layout*/
+.keyword-grid {
+    display: grid;
+    grid-template-columns: 0.25fr 1fr 1fr 1fr 1fr 0.25fr !important;
+    gap: 0.5rem;
+    padding: 0rem 3rem;
+    grid-template-areas: 
+        ". copy copy delete delete ."
+        ". name name color color ."
+        ". tooltip tooltip tooltip tooltip ."
+        ". goto-name goto goto goto ."
+    ;
+}
+
+
+.one-column {
+    display: grid;
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem;
+}
+
+.color-slider-wrapper {
+	position: relative;
+	width: 100%;
+}
+
+.color-slider {
+	display: block;
+	width: 100%;
+	height: 4rem;
+	touch-action: none;
+	opacity: 0.7;
+	transition: opacity 0.2s;
+	border: 0.15rem solid #664c2e;
+	border-radius: 0.25rem;
+}
+
+.color-slider:hover {
+	opacity: 1;
+}
+
+.color-slider-handle {
+	position: absolute;
+	width: 1rem;
+	height: 1rem;
+	border: 0.15rem solid #664c2e;
+	border-radius: 50%;
+	background: #c7ad8a;
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+}
+.keyword-button-open {
+    background: #f3e6cf !important;
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+    color: #332416;
+    cursor: pointer;
+    padding: 0.4rem;
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+.nameArea {
+    height: 2.5rem;
+}
