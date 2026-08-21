@@ -281,8 +281,12 @@ class MapMaker extends App{
             this.mouse.wheel -= delta * 5;
         });
         this.mouse.hook("left-down", "canvas-focus", () => {
+            // if mouse was not in focus, pause other mouse events for 0.5 seconds to prevent accidental drawing
+            if (document.activeElement !== this.canvas) {
+                this.mouse.pause("left", 0.5);
+            }
             this.canvas.focus();
-        });
+        },-1);
         // add ctrl to auto-focus as well
         // if we enter canvas with ctrl pressed, focus the canvas
         this.mouse.hook("mouseenter", "canvas-focus-ctrl", () => {
