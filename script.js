@@ -283,6 +283,12 @@ class MapMaker extends App{
         this.mouse.hook("left-down", "canvas-focus", () => {
             this.canvas.focus();
         });
+        // add ctrl to auto-focus as well
+        window.addEventListener('keydown', (e) => {
+            if (e.key === "Control") {
+                this.canvas.focus();
+            }
+        });
 
         // add engine keybinds
         if (this.zoomLevel === 0) this.PixelEngine.loadMouse(this.mouse)
