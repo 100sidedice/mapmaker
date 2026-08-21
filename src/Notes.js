@@ -328,6 +328,27 @@ export default class Notes {
                 `<span data-keyword="${keyword.id}" style="color:${keyword.color}">${keyword.text}</span>`
             );
         }
+        // add event listeners to Global note titles in the noteText to go to their notes
+        for (const key in this.mapMaker.notes) {
+            if (!key.startsWith("global_")) continue;
+            const note = this.mapMaker.notes[key];
+            if (!note) continue;
+            // get the title from key
+            const title = key.replace("global_", "");
+            // find all instances of the title in the noteText and wrap them in a span with data-global-note attribute
+            const titleRegex = new RegExp(title, "g");
+            noteText.innerHTML = noteText.innerHTML.replace(
+                titleRegex,
+                `<span data-global-note="${key}" style="cursor: pointer;">${title}</span>`
+            );
+            // add event listeners to the spans to go to their notes
+            noteText.querySelectorAll(`[data-global-note="${key}"]`).forEach(span => {
+                span.addEventListener("click", () => {
+                    this.goto(key);
+                });
+            });
+
+        }
 
         noteText.querySelectorAll("[data-keyword]").forEach(span => {
             const keyword = this.mapMaker.notes["keywords"].find(
@@ -345,6 +366,8 @@ export default class Notes {
                 this.goto(keyword.goto);
             });
         });
+        // also link Global note titles to their notes
+        
         // if there is a style tag in the note, add it to the head, adjust selectors to be unique to this note
         const styleTag = noteText.querySelector("style");
         if (styleTag) {

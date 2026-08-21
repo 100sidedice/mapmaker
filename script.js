@@ -284,8 +284,9 @@ class MapMaker extends App{
             this.canvas.focus();
         });
         // add ctrl to auto-focus as well
-        window.addEventListener('keydown', (e) => {
-            if (e.key === "Control") {
+        // if we enter canvas with ctrl pressed, focus the canvas
+        this.mouse.hook("mouseenter", "canvas-focus-ctrl", () => {
+            if (this.ctrl) {
                 this.canvas.focus();
             }
         });
