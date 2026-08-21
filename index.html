@@ -234,6 +234,21 @@
                 </ul>
                 <p>I am Elijah Delima, known online as @100sidedice. My main website: <a href="https://100sidedice.github.io/" style="color:aqua">100sidedice.github.io</a></p>
             </details>
+            <hr>
+            <details>
+                <summary>Update 1 - Variables</summary>
+                <p>This is the first update to the map maker.</p>
+                <p>Just a simple UX improvement, Variables. They allow you to store and reuse text across multiple notes, so you don't have to type the same thing over and over again.</p>
+                <ul>
+                    <li>Wrap a note section in <code>&lt;var key="variableName"&gt;(Your variable content)&lt;/var&gt;</code> to store a variable.</li>
+                    <li>Then, in any note, you can use <code>&lt;paste&gt;variableName&lt;/paste&gt;</code> to insert the variable's value.</li>
+                </ul>
+                <h3>Bug fixes</h3>
+                <ul>
+                    <li>Fixed an issue where if you opened the page, while another window is in focus, the page would not respond to any user input.</li>
+                    <li>Fixed via properly giving the canvas a Tab index, and using the browsers focus system instead of the mouse-over event.</li>
+                </ul>
+            </details>
         </aside>
         <button id="close-instructions">Close Information</button>
         <aside id="notes" class="">

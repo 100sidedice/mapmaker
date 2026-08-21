@@ -19,6 +19,18 @@ export default class Notes {
 
         const input = document.getElementById("noteInput");
         const text = input.value.trim();
+        const variableRegex = /<var\s+key=["']([^"']+)["']>([\s\S]*?)<\/var>/gi;
+        let match;
+
+        while ((match = variableRegex.exec(text)) !== null) {
+            const key = match[1].trim();
+
+            if (!key) {
+                continue;
+            }
+
+            this.mapMaker.notes[`var_${key}`] = match[2];
+        }
 
         if (text === "") {
             delete this.mapMaker.notes[this.mapMaker.currentNoteKey];
@@ -26,7 +38,7 @@ export default class Notes {
         }
         if (!this.mapMaker.notes[this.mapMaker.currentNoteKey]) {
             this.mapMaker.notes[this.mapMaker.currentNoteKey] = {
-                "color": "#ff000033", // default color
+                "color": "#ff000033",
                 "text": text
             };
         } else {
@@ -251,6 +263,50 @@ export default class Notes {
         }
 
     }
+    /**
+     * Expands paste tags using saved note variables.
+     * @param {string} text - Note text containing paste tags.
+     * @returns {string} Note text with variables expanded.
+     */
+    expandNoteVariables(text) {
+        const pasteRegex = /<paste(?:\s+key=["']([^"']+)["'])?\s*>([\s\S]*?)<\/paste>/gi;
+        const shortPasteRegex = /<paste\s+([^<>]+?)\s*\/?>/gi;
+
+        let result = text;
+
+        for (let pass = 0; pass < 10; pass++) {
+            let changed = false;
+
+            result = result.replace(pasteRegex, (match, attributeKey, content) => {
+                const key = (attributeKey || content).trim();
+                const variable = this.mapMaker.notes[`var_${key}`];
+
+                if (variable === undefined) {
+                    return match;
+                }
+
+                changed = true;
+                return variable;
+            });
+
+            result = result.replace(shortPasteRegex, (match, key) => {
+                const variable = this.mapMaker.notes[`var_${key.trim()}`];
+
+                if (variable === undefined) {
+                    return match;
+                }
+
+                changed = true;
+                return variable;
+            });
+
+            if (!changed) {
+                break;
+            }
+        }
+
+        return result;
+    }
     renderNote(note) {
         // remove any existing note styles
         const existingStyles = document.querySelectorAll("style.note-style");
@@ -262,7 +318,8 @@ export default class Notes {
         if (!note) return;
         noteInput.value = note.text;
         const noteText = document.createElement("p");
-        noteText.innerHTML = note.text;
+        const renderedText = this.expandNoteVariables(note.text);
+        noteText.innerHTML = renderedText;
         displayArea.appendChild(noteText);
         for (const keyword of this.mapMaker.notes["keywords"]) {
             const regex = new RegExp(keyword.text, "g");

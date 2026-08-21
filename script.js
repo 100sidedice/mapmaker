@@ -214,21 +214,22 @@ class MapMaker extends App{
         if (this.zoomLevel === 3) this.SpaceEngine.loadKeymap();
         this.activeKeys = new Set();
         this.pausedKeys = new Set();
-        window.addEventListener('keydown', (e) => {    
-            if (!this.mouse.inside) return;        
+        window.addEventListener('keydown', (e) => {  
+            if (document.activeElement !== this.canvas) return;    
             e.preventDefault();
             if (this.keyMap[e.key]) {
                 this.activeKeys.add(e.key);
             }
         });
         window.addEventListener('keyup', (e) => {
-            if (!this.mouse.inside) return;
+            if (document.activeElement !== this.canvas) return;
             if (this.keyMap[e.key] && this.keyMap[e.key]["release-action"]) {
                 this.keyMap[e.key]["release-action"]();
             }
             this.activeKeys.delete(e.key);
             this.pausedKeys.delete(e.key);
         });
+        
     }
     loadMouse(newMouse=false){
         if (newMouse){
@@ -278,6 +279,9 @@ class MapMaker extends App{
             };
 
             this.mouse.wheel -= delta * 5;
+        });
+        this.mouse.hook("left-down", "canvas-focus", () => {
+            this.canvas.focus();
         });
 
         // add engine keybinds
@@ -622,7 +626,6 @@ class MapMaker extends App{
         if (!this.regionTypes.has(this.config.selectedRegionType)) {
             this.config.selectedRegionType = this.defaultRegionHash;
         }
-        console.log("Rebuilt region types:", this.regionTypes);
     }
     
 }
@@ -630,5 +633,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const mapMaker = new MapMaker();
     await mapMaker.load();
     mapMaker.loop();
+    // ensure the canvas is focused so that key events are captured
+    mapMaker.canvas.tabIndex = 0;
+    mapMaker.canvas.focus();
 });
 
