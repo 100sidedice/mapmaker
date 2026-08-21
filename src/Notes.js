@@ -308,7 +308,6 @@ export default class Notes {
         return result;
     }
     renderNote(note) {
-        // remove any existing note styles
         const existingStyles = document.querySelectorAll("style.note-style");
         existingStyles.forEach(style => style.remove());
         const displayArea = document.getElementById("noteDisplay");
@@ -318,38 +317,36 @@ export default class Notes {
         if (!note) return;
         noteInput.value = note.text;
         const noteText = document.createElement("p");
-        const renderedText = this.expandNoteVariables(note.text);
-        noteText.innerHTML = renderedText;
+        noteText.innerHTML = this.expandNoteVariables(note.text);
         displayArea.appendChild(noteText);
+        // I will go back later and make it O((Keywords+Globals)*1) instead of O((Keywords*Globals(global note text))*Note text) but for now this is fine.  
         for (const keyword of this.mapMaker.notes["keywords"]) {
-            const regex = new RegExp(keyword.text, "g");
-            noteText.innerHTML = noteText.innerHTML.replace(
-                regex,
-                `<span data-keyword="${keyword.id}" style="color:${keyword.color}">${keyword.text}</span>`
-            );
+            this.linkNoteText(noteText, keyword.text, span => {
+                span.dataset.keyword = keyword.id;
+                span.style.color = keyword.color;
+            });
         }
-        // add event listeners to Global note titles in the noteText to go to their notes
+
         for (const key in this.mapMaker.notes) {
             if (!key.startsWith("global_")) continue;
-            const note = this.mapMaker.notes[key];
-            if (!note) continue;
-            // get the title from key
+            const globalNote = this.mapMaker.notes[key];
+            if (!globalNote) continue;
+
             const title = key.replace("global_", "");
-            // find all instances of the title in the noteText and wrap them in a span with data-global-note attribute
-            const titleRegex = new RegExp(title, "g");
-            noteText.innerHTML = noteText.innerHTML.replace(
-                titleRegex,
-                `<span data-global-note="${key}" style="cursor: pointer;">${title}</span>`
-            );
-            // add event listeners to the spans to go to their notes
-            noteText.querySelectorAll(`[data-global-note="${key}"]`).forEach(span => {
-                span.addEventListener("click", () => {
-                    this.goto(key);
-                });
+            if (!title) continue;
+
+            this.linkNoteText(noteText, title, span => {
+                span.dataset.globalNote = key;
+                span.style.cursor = "pointer";
             });
-
         }
+        noteText.querySelectorAll("[data-global-note]").forEach(span => {
+            const key = span.dataset.globalNote;
 
+            span.addEventListener("click", () => {
+                this.goto(key);
+            });
+        });
         noteText.querySelectorAll("[data-keyword]").forEach(span => {
             const keyword = this.mapMaker.notes["keywords"].find(
                 keyword => String(keyword.id) === span.dataset.keyword
@@ -366,17 +363,98 @@ export default class Notes {
                 this.goto(keyword.goto);
             });
         });
-        // also link Global note titles to their notes
-        
-        // if there is a style tag in the note, add it to the head, adjust selectors to be unique to this note
         const styleTag = noteText.querySelector("style");
         if (styleTag) {
             const style = document.createElement("style");
             style.innerHTML = styleTag.innerHTML;
-            style.classList.add(`note-style`);// so we can remove it later if needed
+            style.classList.add(`note-style`);
             document.head.appendChild(style);
         }
     }
+
+    /**
+     * Finds text inside a note and replaces it with spans.
+     *
+     * @param {HTMLElement} container - The element containing the note text.
+     * @param {string} searchText - The text to find.
+     * @param {Function} setupSpan - Configures each generated span.
+     */
+    linkNoteText(container, searchText, setupSpan) {
+        if (!searchText) return;
+
+        const isWordCharacter = character => {
+            if (!character) return false;
+            return /[\p{L}\p{N}_]/u.test(character);
+        };
+
+        const walker = document.createTreeWalker(
+            container,
+            NodeFilter.SHOW_TEXT
+        );
+
+        const textNodes = [];
+
+        while (walker.nextNode()) {
+            if (walker.currentNode.parentElement.closest("span")) continue;
+            textNodes.push(walker.currentNode);
+        }
+
+        for (const textNode of textNodes) {
+            const text = textNode.nodeValue;
+            const matches = [];
+            let searchStart = 0;
+
+            while (searchStart < text.length) {
+                const index = text.indexOf(searchText, searchStart);
+
+                if (index === -1) break;
+
+                const before = text[index - 1];
+                const after = text[index + searchText.length];
+
+                const validStart = !isWordCharacter(before);
+                const validEnd = !isWordCharacter(after);
+
+                if (validStart && validEnd) {
+                    matches.push({
+                        start: index,
+                        end: index + searchText.length
+                    });
+                }
+
+                searchStart = index + searchText.length;
+            }
+
+            if (!matches.length) continue;
+
+            const fragment = document.createDocumentFragment();
+            let position = 0;
+
+            for (const match of matches) {
+                if (match.start > position) {
+                    fragment.appendChild(
+                        document.createTextNode(text.slice(position, match.start))
+                    );
+                }
+
+                const span = document.createElement("span");
+                span.textContent = text.slice(match.start, match.end);
+                setupSpan(span);
+
+                fragment.appendChild(span);
+                position = match.end;
+            }
+
+            if (position < text.length) {
+                fragment.appendChild(
+                    document.createTextNode(text.slice(position))
+                );
+            }
+
+            textNode.replaceWith(fragment);
+        }
+    }
+
     generateCatagories(...openCatagories){
         // if not in note browser, return
         const noteBrowser = document.getElementById("note-browser-main");
