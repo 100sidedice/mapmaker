@@ -635,7 +635,7 @@ export default class Notes {
                         removeTooltip(keywordButton);
                         keywordButton.style.setProperty("color", "#332416", "important");
                         // update color handle
-                        loadHandle(keyword.color); 
+                        loadHandle(keyword.color, false, false); 
                         
                     } else {
                         keywordFieldset.classList.add("hide");
@@ -1094,9 +1094,8 @@ export function createColorSlider(container, onChange, alpha = false, initialCol
 			brightnessGradient.addColorStop(1 - (1 - centerValue) / 2, "rgba(0, 0, 0, 0.6)");
 
 			ctx.fillStyle = brightnessGradient;
-			ctx.globalCompositeOperation = "color";
 			ctx.fillRect(0, 0, canvas.width, canvas.height);
-			ctx.globalCompositeOperation = "source-over";
+			ctx.globalCompositeOperation = "color";
 		}
 
 		const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
