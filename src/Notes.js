@@ -1,10 +1,12 @@
 import { addTooltip, removeTooltip, clearTooltip } from "./Tooltip.js";
 import SearchEngine from "./SearchEngine.js";
+import DiceRoller from "./DiceRoller.js";
 
 export default class Notes {
     constructor(mapMaker){
         this.mapMaker = mapMaker;
         this.searchEngine = new SearchEngine(this.mapMaker.notes);
+        this.diceRoller = new DiceRoller();
     }
 
     load(){
@@ -13,6 +15,21 @@ export default class Notes {
         showElms(document.querySelector("#notes > main"), "section.area", "noteBrowser");
         showElms(document.querySelector("#notes > main #mainNoteControls"), "button", "");
         this.generateCatagories();
+
+        // if notes header is pressed, toggle main note area
+        const notesHeader = document.getElementById("notesHeader");
+        notesHeader.addEventListener("click", () => {
+            console.log("Notes header clicked");
+            const mainNoteArea = document.getElementById("notesMain");
+            mainNoteArea.classList.toggle("hidden");
+            // shrink notes area to just header size
+            const notes = document.getElementById("notes");
+            if (mainNoteArea.classList.contains("hidden")) {
+                notes.style.height = "3rem";
+            } else {
+                notes.style.height = "auto";
+            }
+        });
     }
     saveCurrentNote() {
         if (!this.mapMaker.currentNoteKey) return;
@@ -307,19 +324,28 @@ export default class Notes {
 
         return result;
     }
+
     renderNote(note) {
         const existingStyles = document.querySelectorAll("style.note-style");
         existingStyles.forEach(style => style.remove());
+
         const displayArea = document.getElementById("noteDisplay");
         displayArea.innerHTML = "";
+
         const noteInput = document.getElementById("noteInput");
         noteInput.value = "";
+
         if (!note) return;
+
         noteInput.value = note.text;
+
         const noteText = document.createElement("p");
         noteText.innerHTML = this.expandNoteVariables(note.text);
         displayArea.appendChild(noteText);
-        // I will go back later and make it O((Keywords+Globals)*1) instead of O((Keywords*Globals(global note text))*Note text) but for now this is fine.  
+
+        this.parseDiceExpressions(noteText);
+
+        // I will go back later and make it O((Keywords+Globals)*1) instead of O((Keywords*Globals(global note text))*Note text) but for now this is fine.
         for (const keyword of this.mapMaker.notes["keywords"]) {
             this.linkNoteText(noteText, keyword.text, span => {
                 span.dataset.keyword = keyword.id;
@@ -329,6 +355,7 @@ export default class Notes {
 
         for (const key in this.mapMaker.notes) {
             if (!key.startsWith("global_")) continue;
+
             const globalNote = this.mapMaker.notes[key];
             if (!globalNote) continue;
 
@@ -340,6 +367,7 @@ export default class Notes {
                 span.style.cursor = "pointer";
             });
         }
+
         noteText.querySelectorAll("[data-global-note]").forEach(span => {
             const key = span.dataset.globalNote;
 
@@ -347,14 +375,18 @@ export default class Notes {
                 this.goto(key);
             });
         });
+
         noteText.querySelectorAll("[data-keyword]").forEach(span => {
             const keyword = this.mapMaker.notes["keywords"].find(
                 keyword => String(keyword.id) === span.dataset.keyword
             );
+
             if (!keyword) return;
+
             if (keyword.tooltip) {
                 addTooltip(span, keyword.tooltip);
             }
+
             if (!keyword.goto) return;
 
             span.style.cursor = "pointer";
@@ -363,15 +395,186 @@ export default class Notes {
                 this.goto(keyword.goto);
             });
         });
+
         const styleTag = noteText.querySelector("style");
         if (styleTag) {
             const style = document.createElement("style");
             style.innerHTML = styleTag.innerHTML;
-            style.classList.add(`note-style`);
+            style.classList.add("note-style");
             document.head.appendChild(style);
         }
     }
 
+    /**
+     * Finds dice expressions in a note and makes them clickable.
+     *
+     * @param {HTMLElement} noteText
+     */
+    parseDiceExpressions(noteText) {
+        const walker = document.createTreeWalker(
+            noteText,
+            NodeFilter.SHOW_TEXT
+        );
+
+        const textNodes = [];
+
+        while (walker.nextNode()) {
+            const node = walker.currentNode;
+
+            if (node.parentElement?.closest("[data-dice-expression]")) continue;
+            textNodes.push(node);
+        }
+
+        for (const textNode of textNodes) {
+            this.parseDiceTextNode(textNode);
+        }
+    }
+
+	/**
+	 * Converts dice expressions in a text node into clickable spans.
+	 *
+	 * @param {Text} textNode
+	 */
+	parseDiceTextNode(textNode) {
+		const dicePattern = /\[([^\]]+)\]/g;
+		const text = textNode.nodeValue;
+
+		if (!dicePattern.test(text)) {
+			dicePattern.lastIndex = 0;
+			return;
+		}
+
+		dicePattern.lastIndex = 0;
+
+		const fragment = document.createDocumentFragment();
+		let lastIndex = 0;
+		let match;
+
+		while ((match = dicePattern.exec(text)) !== null) {
+			const expression = match[1].trim();
+
+			if (!this.diceRollerExpressionIsValid(expression)) continue;
+
+			fragment.appendChild(
+				document.createTextNode(text.slice(lastIndex, match.index))
+			);
+
+			const diceSpan = document.createElement("span");
+			diceSpan.dataset.diceExpression = expression;
+			diceSpan.textContent = `[${this.formatDiceExpression(expression)}]`;
+			diceSpan.style.cursor = "pointer";
+
+			addTooltip(diceSpan, "Click to roll");
+
+			diceSpan.addEventListener("click", event => {
+				event.stopPropagation();
+				this.rollNoteDice(diceSpan, expression);
+			});
+
+			fragment.appendChild(diceSpan);
+			lastIndex = match.index + match[0].length;
+		}
+
+		if (lastIndex === 0) return;
+
+		fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+		textNode.replaceWith(fragment);
+	}
+
+	/**
+	 * Formats dice syntax for display without changing the source expression.
+	 *
+	 * @param {string} expression
+	 * @returns {string}
+	 */
+	formatDiceExpression(expression) {
+		return expression
+			.replace(/\(\s*([+\-*/])\s*(\d+(?:\.\d+)?)\s*\)/g, "$1$2")
+			.replace(
+				/\(\s*(advantage|disadvantage|adv|dis|adv-all|dis-all)\s*\)/gi,
+				"$1"
+			)
+			.replace(
+				/\(\s*(advantage|disadvantage|adv|dis|adv-all|dis-all)\s+([+\-*/])\s*(\d+(?:\.\d+)?)\s*\)/gi,
+				"$1 $2$3"
+			);
+	}
+
+    /**
+     * Checks whether text contains a dice expression.
+     *
+     * @param {string} expression
+     * @returns {boolean}
+     */
+    diceRollerExpressionIsValid(expression) {
+        return /\b\d*d\d+\b/i.test(expression);
+    }
+
+    /**
+     * Rolls a dice expression from a note.
+     *
+     * @param {HTMLElement} span
+     * @param {string} expression
+     */
+    rollNoteDice(span, expression) {
+        try {
+            const result = this.diceRoller.roll(expression);
+            const displayExpression = this.formatDiceExpression(expression);
+
+            removeTooltip(span);
+            addTooltip(span, result.breakdown);
+
+            span.innerHTML = "";
+
+            const expressionSpan = document.createElement("span");
+            expressionSpan.textContent = `[${displayExpression}]`;
+
+            const resultSpan = document.createElement("span");
+            resultSpan.dataset.diceResult = "";
+            resultSpan.textContent = ` → ${result.total}`;
+            resultSpan.style.cursor = "pointer";
+
+            resultSpan.addEventListener("click", event => {
+                event.stopPropagation();
+                this.hideDiceResult(span, expression);
+            });
+
+            span.appendChild(expressionSpan);
+            span.appendChild(resultSpan);
+        } catch (error) {
+            console.error("Failed to roll dice expression:", expression, error);
+
+            removeTooltip(span);
+            addTooltip(span, error.message);
+
+            span.innerHTML = "";
+
+            const expressionSpan = document.createElement("span");
+            expressionSpan.textContent = `[${this.formatDiceExpression(expression)}]`;
+
+            const resultSpan = document.createElement("span");
+            resultSpan.dataset.diceResult = "";
+            resultSpan.textContent = " → Error";
+
+            span.appendChild(expressionSpan);
+            span.appendChild(resultSpan);
+        }
+    }
+
+    /**
+     * Hides a dice roll result and restores the normal expression display.
+     *
+     * @param {HTMLElement} span
+     * @param {string} expression
+     */
+    hideDiceResult(span, expression) {
+        removeTooltip(span);
+        addTooltip(span, "Click to roll");
+
+        span.innerHTML = "";
+        span.textContent = `[${this.formatDiceExpression(expression)}]`;
+    }
+    
     /**
      * Finds text inside a note and replaces it with spans.
      *

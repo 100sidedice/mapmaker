@@ -282,7 +282,7 @@ export default class RegionEngine {
                         }
                         continue;
                     }
-                    if (this.config.selectedRegionType === "delete" || this.mouse.get("right")){
+                    if (this.config.selectedRegionType === "delete" || (this.config.erase || this.mouse.get("right"))){
                         // remove the region from the group
                         if (this.mapMaker.map[key]["groups"] && this.mapMaker.map[key]["groups"][this.config.lastPickedGroup]){
                             delete this.mapMaker.map[key]["groups"][this.config.lastPickedGroup];
@@ -345,6 +345,7 @@ export default class RegionEngine {
         this.updateRegions()
         
     }
+
     /**
      * Centers the camera on a tile.
      * @param {number} rx - Region X coordinate.
@@ -718,16 +719,20 @@ export default class RegionEngine {
         })
         // clear selection
         this.mouse.hook("right-down","region-delete-selected",(pos)=>{
-            if (this.config.regionSelectionExists && !this.config.alt) {
-                for (const key in this.mapMaker.map) {
-                    this.mapMaker.map[key]["selected"] = false;
-                }
-                this.mouse.pause("right");
-            }
+            this.deselectAll();
         })
         // brush logic
         this.mouse.hook("right-hold", "region-brush-remove", this.brush.bind(this));
         this.mouse.hook("left-hold", "region-brush", this.brush.bind(this));
+    }
+
+    deselectAll(){
+        if (this.config.regionSelectionExists && !this.config.alt) {
+            for (const key in this.mapMaker.map) {
+                this.mapMaker.map[key]["selected"] = false;
+            }
+            this.mouse.pause("right");
+        }
     }
 
     update(){

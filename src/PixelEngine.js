@@ -238,10 +238,10 @@ export default class PixelEngine {
                 const minY = Math.max(startPixelY, tileY * 32) - tileY * 32;
                 const maxY = Math.min(endPixelY, tileY * 32 + 31) - tileY * 32;
 
-                ctx.fillStyle = this.mouse.get("right") ? "#ffffff" : this.config.selectedColor;
+                ctx.fillStyle = (this.config.erase || this.mouse.get("right")) ? "#ffffff" : this.config.selectedColor;
                 ctx.fillRect(minX, minY, maxX - minX + 1, maxY - minY + 1);
                 // if editing 'delete', right click should delete
-                if (this.config.selectedTileType === "delete" && this.mouse.get("right")) {
+                if (this.config.selectedTileType === "delete" && (this.config.erase || this.mouse.get("right"))) {
                     ctx.clearRect(minX, minY, maxX - minX + 1, maxY - minY + 1);
                 }
             }
@@ -685,6 +685,10 @@ export default class PixelEngine {
         this.config.selectionExists = selectionExists;
 
         this.updateToolbar();
+    }
+
+    isSelection(){
+        return this.config.selectionExists;
     }
 
     queueRegion(key, tiles){

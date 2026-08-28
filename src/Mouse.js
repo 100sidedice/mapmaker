@@ -55,6 +55,9 @@ export default class Mouse {
         });
 
         this.element.addEventListener('mousemove', (e) => {
+            if (this.lockedPos) {
+                return;
+            }
             const rect = this.element.getBoundingClientRect();
 
             this.setPos(e.clientX - rect.left, e.clientY - rect.top);
@@ -361,6 +364,7 @@ export default class Mouse {
             });
         }
     }
+
     startDrawAnimation() {
         cancelAnimationFrame(this.touch.drawAnimation);
 
@@ -445,6 +449,10 @@ export default class Mouse {
     }
 
     pause(button, duration = 9999999999999) {
+        // if it has a -, delete everything after it
+        if (button.includes("-")) {
+            button = button.split("-")[0];
+        }
         button = this.getButtonName(button);
 
         if (!this.buttons[button]) {
@@ -537,6 +545,21 @@ export default class Mouse {
             priority
         };
     }
+    weakHook(hookName, name, callback, low_or_high = "low", bindTo) {
+        function run(...args) {
+            if (bindTo) {
+                callback = callback.bind(bindTo);
+            }
+            callback(...args);
+            this.unhook(hookName, name);
+        }
+        if (low_or_high === "high") {
+            this.hook(hookName, name, run.bind(this), 100);
+        } else {
+            this.hook(hookName, name, run.bind(this), -100);
+        }
+        this.hooks[hookName][name].weak = true;
+    }
 
     unhook(hookName, name = null) {
         if (!this.hooks[hookName]) {
@@ -578,5 +601,15 @@ export default class Mouse {
 
             hook.callback(...args, event);
         }
+    }
+    runAction(hook, actionName, ...args){
+        this.hooks[hook][actionName].callback(...args);
+    }
+
+    lockPos() {
+        this.lockedPos = true;
+    }
+    unlockPos() {
+        this.lockedPos = false;
     }
 }

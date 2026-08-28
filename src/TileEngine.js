@@ -291,13 +291,13 @@ export default class TileEngine {
                             if (tile !== "") {
                                 if (this.mouse.get("left") || method==="select") {
                                     tile[1] = "selected";
-                                } else if (this.mouse.get("right") && tile[1] === "selected") {
+                                } else if ((this.config.erase || this.mouse.get("right")) && tile[1] === "selected") {
                                     tile[1] = "";
                                 }
                             }
                         } else {
                             // paint/delete brush
-                            if (this.mouse.get("right") || this.config.selectedTileType === "delete") {
+                            if ((this.config.erase || this.mouse.get("right")) || this.config.selectedTileType === "delete") {
                                 this.mapMaker.map[key]["tiles"][localY][localX] = "";
                             } else {
                                 let wasSelected = "";
@@ -315,7 +315,7 @@ export default class TileEngine {
 
                 // remove empty regions only when painting/deleting
                 if (!this.config.alt &&
-                    (this.mouse.get("right") || this.config.selectedTileType === "delete") &&
+                    ((this.config.erase || this.mouse.get("right")) || this.config.selectedTileType === "delete") &&
                     this.mapMaker.map[key]["tiles"].every(row => row.every(tile => tile === ""))) {
                     delete this.mapMaker.map[key];
                 }
@@ -325,7 +325,12 @@ export default class TileEngine {
         this.updateRegions()
         
     }
+
     annotate(pos,event){
+        if (this.config.erase){
+            this.annotateDelete(pos,event);
+            return;
+        }
         if (!this.config.annotate) return;
         const worldPos = this.mapMaker.screenToWorld(pos.x, pos.y);
 
@@ -339,6 +344,7 @@ export default class TileEngine {
         event.consume()
 
     }
+
     annotateDelete(pos,event){
         if (!this.config.annotate) return;
         const worldPos = this.mapMaker.screenToWorld(pos.x, pos.y);
@@ -839,6 +845,7 @@ export default class TileEngine {
             
         };
     }
+
     updateToolbar() {
         const tileContainer = document.getElementById("tileContainer");
 
@@ -906,22 +913,26 @@ export default class TileEngine {
         },2)
         // delete all selected tiles
         this.mouse.hook("right-down","tile-delete-selected",(pos)=>{
-            if (this.config.selectionExists && !this.config.alt) {
-                for (const key in this.mapMaker.map) {
-                    for (let row = 0; row < 8; row++) {
-                        for (let col = 0; col < 8; col++) {
-                            if (this.mapMaker.map[key]["tiles"][row][col] !== "" && this.mapMaker.map[key]["tiles"][row][col][1] === "selected") {
-                                this.mapMaker.map[key]["tiles"][row][col][1] = "";
-                            }
-                        }
-                    }
-                }
-                this.mouse.pause("right");
-            }
+            this.deselectAll();
         },3)
         // brush logic
         this.mouse.hook("right-hold", "tile-brush-remove", this.brush.bind(this), 5);
         this.mouse.hook("left-hold", "tile-brush", this.brush.bind(this), 5);
+    }
+
+    deselectAll(){
+        if (this.config.selectionExists && !this.config.alt) {
+            for (const key in this.mapMaker.map) {
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        if (this.mapMaker.map[key]["tiles"][row][col] !== "" && this.mapMaker.map[key]["tiles"][row][col][1] === "selected") {
+                            this.mapMaker.map[key]["tiles"][row][col][1] = "";
+                        }
+                    }
+                }
+            }
+            this.mouse.pause("right");
+        }
     }
 
     update(){

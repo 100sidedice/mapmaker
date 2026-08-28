@@ -32,7 +32,7 @@ body {
     grid-template-columns: 3fr 2fr 8fr 27rem;
     grid-template-rows: 1fr 8fr 0.5fr;
     grid-template-areas: 
-    "sidebar sidebar . notes"
+    "sidebar sidebar toolbar notes"
     "instructions content content notes"
     "buttons buttons buttons notes";
     height: 100dvh;
@@ -78,7 +78,6 @@ button {
     padding: 0.5rem 1rem;
     cursor: pointer;
     transition: transform 0.1s ease-in-out, background 0.1s ease-in-out, color 0.1s ease-in-out;
-
 }
 button:hover {
     background: #676767;
@@ -89,6 +88,7 @@ button:active {
     background: #000000;
     color: #ffffff;
     transform: scale(0.98);
+    cursor: grabbing;
 }
 .tile{
     transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out, border 0.1s ease-in-out;
@@ -109,7 +109,6 @@ button:active {
     border: 0.2rem solid #676767;
     margin: 1rem 1rem 0rem 1rem;
     padding: 0.5rem;
-    pointer-events: none;
     overflow-y: scroll;
     height: calc(100% - 7rem);
 }
@@ -127,6 +126,9 @@ details summary{
     pointer-events: all;
     user-select: none;
     background: #181922;
+
+    touch-action: pan-y;
+    overscroll-behavior: scroll;
 }
 details {
     pointer-events: all;
@@ -190,4 +192,43 @@ ul {
 #colorSlider{
     width: 5rem;
     height: 1.5rem;
+}
+
+#toolbar {
+    grid-area: toolbar;
+    display: flex;
+    justify-content: start;
+    align-items: center;
+    background: #181922;
+    border: 0.2rem solid #bdbdbd;
+    margin: 0.5rem 1rem 0rem 1rem;
+    padding: 0.5rem;
+    z-index: 1;
+    gap: 0.5rem;
+    padding-top: 0rem;
+}
+#toolbar legend {
+    color: #d1d1d1;
+}
+#toolbar button {
+    flex: 1;
+    height: 100%;
+    margin: 0rem;
+    background: #232641;
+    border: 0.2rem solid #677d97;
+    border-radius: 0.25rem;
+    color: #b9b9b9;
+    cursor: pointer;
+    pointer-events: all;
+}
+#toolbar button:active {
+    cursor: grabbing;
+}
+#toolbar button.toggled {
+    background: #194b4b;
+    border: 0.2rem solid #478683;
+    color: #9dd4d4;
+}
+span {
+    user-select: none;
 }

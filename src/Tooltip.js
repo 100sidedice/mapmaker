@@ -61,6 +61,32 @@ class TooltipManager {
 	show(element, text) {
 		this.clearTimeout();
 
+		// if element does not exist, do not show tooltip
+		if (!element) {
+			// remove any existing tooltips
+			this.hide();
+			return;
+		}
+		// if the pos is invalid, or less then 0,0
+		const rect = element.getBoundingClientRect();
+		if (rect.left < 0 || rect.top < 0) {
+			// remove any existing tooltips
+			this.hide();
+			return;
+		}
+		// if element is not visible, do not show tooltip
+		if (!element.offsetParent) {
+			// remove any existing tooltips
+			this.hide();
+			return;
+		}
+		// if display is none, do not show tooltip
+		if (window.getComputedStyle(element).display === "none") {
+			// remove any existing tooltips
+			this.hide();
+			return;
+		}
+
 		this.target = element;
 
 		this.timeout = setTimeout(() => {

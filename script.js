@@ -12,640 +12,1145 @@ import { initializeTooltips } from './src/Tooltip.js';
 import { createColorSlider } from './src/Notes.js';
 
 class MapMaker extends App{
-    constructor() {
-        super();
-        this.dpi = resizeCanvas();
-        window.addEventListener('resize', () => {
-            this.dpi = resizeCanvas();
-        });
-        this.images = {};
-        
-        // camera (start centered at 0,0)
-        this.camera = {
-            "x": -this.canvas.width / 5 / this.dpi / 3,
-            "y": -this.canvas.height / 5 / this.dpi / 3,
-            "vx": 0,
-            "vy": 0,
-            "speed": 2,
-            "zoom": 3,
-            "width": this.canvas.width / this.dpi,
-            "height": this.canvas.height / this.dpi
-        }
-        this.visualViewport = window.visualViewport || { width: window.innerWidth, height: window.innerHeight };
+	constructor() {
+		super();
+		this.dpi = resizeCanvas();
+		window.addEventListener('resize', () => {
+			this.dpi = resizeCanvas();
+		});
+		this.images = {};
+		
+		// camera (start centered at 0,0)
+		this.camera = {
+			"x": -this.canvas.width / 5 / this.dpi / 3,
+			"y": -this.canvas.height / 5 / this.dpi / 3,
+			"vx": 0,
+			"vy": 0,
+			"speed": 2,
+			"zoom": 3,
+			"width": this.canvas.width / this.dpi,
+			"height": this.canvas.height / this.dpi
+		}
+		this.visualViewport = window.visualViewport || { width: window.innerWidth, height: window.innerHeight };
 
-        // map  "x_y" = 8x8 region of the map, row:[col:[tile type, selected || ""]] 
-        this.map = {
-        }
-        this.notes = { // "rx_ry_x_y" = note text
-            "keywords":[] // {"text": "keyword", "color": "#hex", "tooltip": "tooltip text"}
-        }
-        this.regionTypes = new Map();  // hash -> { count, tiles }
-        
-        this.annotations = []; // {color, points:[{x,y}], left, top, right, bottom}
-        this.regions = {};
-        this.lastPicked = null;
+		// map  "x_y" = 8x8 region of the map, row:[col:[tile type, selected || ""]] 
+		this.map = {
+		}
+		this.notes = { // "rx_ry_x_y" = note text
+			"keywords":[] // {"text": "keyword", "color": "#hex", "tooltip": "tooltip text"}
+		}
+		this.regionTypes = new Map();  // hash -> { count, tiles }
+		
+		this.annotations = []; // {color, points:[{x,y}], left, top, right, bottom}
+		this.regions = {};
+		this.lastPicked = null;
 
-        this.saver = new Saver();
-        this.saver.saveHook = () => {
-            this.saver.saveFile = {
-                map: this.map,
-                camera: this.camera,
-                notes: this.notes,
-                config: this.config,
-                zoomLevel: this.zoomLevel,
-                annotations: this.annotations,
-            };
-        };
-        this.zoomLevel = 1; // 0 = pixel, 1 = tile, 2 = region
-        // Config declaration
-        this.config = {
-            showPreview: null,
-            lastPicked: null,
-            brushSize: 1,
-            selectedTileType: "floor",
-            selectedColor: "#000000",
-            selectedRegionType: 1588504069,
-            printedRegionCount: 16, // How many 3d printed region bases we have
-            annotate: false,
-            annotate_color: "#FF0000",
-            lastPickedRegion: null,
-            lastPickedGroup: null,
-            lastPicked: null
-        }
-        this.zoomLevel = 1;
-        // give a default region type (default hash is filled floor with wall outline)
-        this.defaultRegion = [];
-        for (let y = 0; y < 8; y++) {
-            const row = [];
+		this.saver = new Saver();
+		this.saver.saveHook = () => {
+			this.saver.saveFile = {
+				map: this.map,
+				camera: this.camera,
+				notes: this.notes,
+				config: this.config,
+				zoomLevel: this.zoomLevel,
+				annotations: this.annotations,
+			};
+		};
+		this.zoomLevel = 1; // 0 = pixel, 1 = tile, 2 = region
+		// Config declaration
+		this.config = {
+			showPreview: null,
+			lastPicked: null,
+			brushSize: 1,
+			selectedTileType: "floor",
+			selectedColor: "#000000",
+			selectedRegionType: 1588504069,
+			printedRegionCount: 16, // How many 3d printed region bases we have
+			annotate: false,
+			annotate_color: "#FF0000",
+			lastPickedRegion: null,
+			lastPickedGroup: null,
+			lastPicked: null
+		}
+		this.zoomLevel = 1;
+		// give a default region type (default hash is filled floor with wall outline)
+		this.defaultRegion = [];
+		for (let y = 0; y < 8; y++) {
+			const row = [];
 
-            for (let x = 0; x < 8; x++) {
-                const type =
-                    y === 0 || y === 7 || x === 0 || x === 7
-                        ? "wall"
-                        : "floor";
+			for (let x = 0; x < 8; x++) {
+				const type =
+					y === 0 || y === 7 || x === 0 || x === 7
+						? "wall"
+						: "floor";
 
-                row.push([type, ""]);
-            }
+				row.push([type, ""]);
+			}
 
-            this.defaultRegion.push(row);
-        }
-        this.defaultRegionHash = 1588504069;
-        this.saver.load((save) => {
-            if (save.map) this.map = save.map;
-            if (save.camera) this.camera = save.camera;
-            if (save.config) this.config = save.config;
-            if (save.notes) this.notes = save.notes;
-            if (save.zoomLevel !== undefined) this.zoomLevel = save.zoomLevel;
-            if (save.annotations) this.annotations = save.annotations;
+			this.defaultRegion.push(row);
+		}
+		this.defaultRegionHash = 1588504069;
+		this.saver.load((save) => {
+			if (save.map) this.map = save.map;
+			if (save.camera) this.camera = save.camera;
+			if (save.config) this.config = save.config;
+			if (save.notes) this.notes = save.notes;
+			if (save.zoomLevel !== undefined) this.zoomLevel = save.zoomLevel;
+			if (save.annotations) this.annotations = save.annotations;
 
-            // Normalize map first
-            for (const key in this.map) {
-                for (let row = 0; row < 8; row++) {
-                    for (let col = 0; col < 8; col++) {
-                        const tile = this.map[key].tiles[row][col];
+			// Normalize map first
+			for (const key in this.map) {
+				for (let row = 0; row < 8; row++) {
+					for (let col = 0; col < 8; col++) {
+						const tile = this.map[key].tiles[row][col];
 
-                        if (typeof tile === "string" && tile !== "") {
-                            this.map[key].tiles[row][col] = [tile, ""];
-                        }
-                    }
-                }
-            }
-            
+						if (typeof tile === "string" && tile !== "") {
+							this.map[key].tiles[row][col] = [tile, ""];
+						}
+					}
+				}
+			}
+			
 
-            // regionTypes is derived data; rebuild it
-            this.rebuildRegionTypes();
-        });
-        
-        
-        this.regionTypes.set(this.defaultRegionHash, { count: 1, tiles: this.defaultRegion });
+			// regionTypes is derived data; rebuild it
+			this.rebuildRegionTypes();
+		});
 
-        this.Notes = new Notes(this);
-    }
-    async load() {
-        const save = await this.saver.load();
+		this.inputContext = null;
+		this.pointerPosition = null;
+		this.bindInputContext();
+		
+		
+		this.regionTypes.set(this.defaultRegionHash, { count: 1, tiles: this.defaultRegion });
 
-        if (save) {
-            this.map = save.map ?? this.map;
-            this.camera = save.camera ?? this.camera;
-            this.config = save.config ?? this.config;
-            this.notes = save.notes ?? this.notes;
-            this.zoomLevel = save.zoomLevel ?? this.zoomLevel;
-            this.annotations = save.annotations ?? this.annotations;
-        }
+		this.Notes = new Notes(this);
+	}
+	async load() {
+		const save = await this.saver.load();
 
-        await this.loadImages(save?.images);
-        this.PixelEngine = new PixelEngine(this);
-        this.TileEngine = new TileEngine(this);
-        this.RegionEngine = new RegionEngine(this);
-        this.SpaceEngine = new SpaceEngine(this);
+		if (save) {
+			this.map = save.map ?? this.map;
+			this.camera = save.camera ?? this.camera;
+			this.config = save.config ?? this.config;
+			this.notes = save.notes ?? this.notes;
+			this.zoomLevel = save.zoomLevel ?? this.zoomLevel;
+			this.annotations = save.annotations ?? this.annotations;
+		}
 
-        this.loadKeymap();
-        this.loadMouse(true);
-        this.loadButtons();
-        this.Notes.load();
-        this.rebuildRegionTypes();
-        this.PixelEngine.load(this);
-        this.TileEngine.load(this);
-        this.RegionEngine.load(this);
-        this.SpaceEngine.load(this);
+		await this.loadImages(save?.images);
+		this.PixelEngine = new PixelEngine(this);
+		this.TileEngine = new TileEngine(this);
+		this.RegionEngine = new RegionEngine(this);
+		this.SpaceEngine = new SpaceEngine(this);
 
-        initializeTooltips();
-        // add color slider to the config panel
-        const colorSliderContainer = document.getElementById("buttonContainer");
-        const [slider, event] = createColorSlider(colorSliderContainer, (color) => {
-            if (this.zoomLevel === 1) {
-                this.config.annotate_color = color;
-            } else {
-                this.config.selectedColor = color;
-            }
-        }, false, this.config.selectedColor, "5rem", "3rem", true);
-        this.colorSliderEvent = event;
-        slider.id = "colorSlider";
-        if (this.zoomLevel === 1) {
-            this.colorSliderEvent(this.config.annotate_color, true, false);
-        } else {
-            this.colorSliderEvent(this.config.selectedColor, false, true);
-        }
-        this.saver.startAutosave(this.images);
-    }
-    /**
-     * Loads the default and saved tile images.
-     * @param {Object<string, Blob>} savedImages
-     * @returns {Promise<void>}
-     */
-    async loadImages(savedImages = {}) {
-        const files = {
-            delete: "assets/delete.png",
-            addTile: "assets/add.png",
-            floor: "assets/floor.png",
-            wall: "assets/wall.png",
-            marker: "assets/marker.png",
-        };
-        for (const [key, src] of Object.entries(files)) {
-            this.images[key] = await this.loadImage(src);
-        }
-        for (const [key, blob] of Object.entries(savedImages)) {
-            this.images[key] = await this.loadImage(URL.createObjectURL(blob));
-        }
-    }
+		this.loadKeymap();
+		this.loadMouse(true);
+		this.loadButtons();
+		this.Notes.load();
+		this.rebuildRegionTypes();
+		this.PixelEngine.load(this);
+		this.TileEngine.load(this);
+		this.RegionEngine.load(this);
+		this.SpaceEngine.load(this);
 
-    /**
-     * Loads an image from a URL.
-     * @param {string} src
-     * @returns {Promise<HTMLImageElement>}
-     */
-    loadImage(src) {
-        return new Promise((resolve, reject) => {
-            const image = new Image();
+		initializeTooltips();
+		// add color slider to the config panel
+		const colorSliderContainer = document.getElementById("buttonContainer");
+		const [slider, event] = createColorSlider(colorSliderContainer, (color) => {
+			if (this.zoomLevel === 1) {
+				this.config.annotate_color = color;
+			} else {
+				this.config.selectedColor = color;
+			}
+		}, false, this.config.selectedColor, "5rem", "3rem", true);
+		this.colorSliderEvent = event;
+		slider.id = "colorSlider";
+		if (this.zoomLevel === 1) {
+			this.colorSliderEvent(this.config.annotate_color, true, false);
+		} else {
+			this.colorSliderEvent(this.config.selectedColor, false, true);
+		}
+		this.createToolbar();
+		this.saver.startAutosave(this.images);
+	}
+	/**
+	 * Loads the default and saved tile images.
+	 * @param {Object<string, Blob>} savedImages
+	 * @returns {Promise<void>}
+	 */
+	async loadImages(savedImages = {}) {
+		const files = {
+			delete: "assets/delete.png",
+			addTile: "assets/add.png",
+			floor: "assets/floor.png",
+			wall: "assets/wall.png",
+			marker: "assets/marker.png",
+		};
+		for (const [key, src] of Object.entries(files)) {
+			this.images[key] = await this.loadImage(src);
+		}
+		for (const [key, blob] of Object.entries(savedImages)) {
+			this.images[key] = await this.loadImage(URL.createObjectURL(blob));
+		}
+	}
 
-            image.onload = () => resolve(image);
-            image.onerror = reject;
-            image.src = src;
-        });
-    }
-    loadKeymap(){
-        this.shift = false;
-        this.alt = false;
-        this.ctrl = false;
+	/**
+	 * Loads an image from a URL.
+	 * @param {string} src
+	 * @returns {Promise<HTMLImageElement>}
+	 */
+	loadImage(src) {
+		return new Promise((resolve, reject) => {
+			const image = new Image();
 
-        if (this.zoomLevel === 0) this.PixelEngine.loadKeymap();
-        if (this.zoomLevel === 1) this.TileEngine.loadKeymap();
-        if (this.zoomLevel === 2) this.RegionEngine.loadKeymap();
-        if (this.zoomLevel === 3) this.SpaceEngine.loadKeymap();
-        this.activeKeys = new Set();
-        this.pausedKeys = new Set();
-        window.addEventListener('keydown', (e) => {  
-            if (document.activeElement !== this.canvas) return;    
-            e.preventDefault();
-            if (this.keyMap[e.key]) {
-                this.activeKeys.add(e.key);
-            }
-        });
-        window.addEventListener('keyup', (e) => {
-            if (document.activeElement !== this.canvas) return;
-            if (this.keyMap[e.key] && this.keyMap[e.key]["release-action"]) {
-                this.keyMap[e.key]["release-action"]();
-            }
-            this.activeKeys.delete(e.key);
-            this.pausedKeys.delete(e.key);
-        });
-        
-    }
-    loadMouse(newMouse=false){
-        if (newMouse){
-            this.mouse = new Mouse(this.canvas);
-            this.mouse.attachListeners();
-        }else{
-            this.mouse.unhookAll()
-        }
-        // middle mouse drag to move camera
-        this.mouse.hook("mousemove", "camera-move", (pos,delta) => {
-            if (this.mouse.get("middle")) {
-                this.camera.x -= delta.dx / this.dpi / this.camera.zoom;
-                this.camera.y -= delta.dy / this.dpi / this.camera.zoom;
-            }
-        });
+			image.onload = () => resolve(image);
+			image.onerror = reject;
+			image.src = src;
+		});
+	}
+	loadKeymap() {
+		this.shift = false;
+		this.alt = false;
+		this.ctrl = false;
 
-        // camera zoom with mouse wheel
-        this.mouse.hook("wheel", "camera-zoom", (pos) => {
-            // Store the exact mouse position where the zoom is happening.
-            this.mouse.extraData.wheelPos = {
-                x: pos.x,
-                y: pos.y
-            };
-        });
+		if (this.zoomLevel === 0) this.PixelEngine.loadKeymap();
+		if (this.zoomLevel === 1) this.TileEngine.loadKeymap();
+		if (this.zoomLevel === 2) this.RegionEngine.loadKeymap();
+		if (this.zoomLevel === 3) this.SpaceEngine.loadKeymap();
 
-        this.mouse.hook("wheel-update", "camera-zoom-update", () => {
-            const wheelPos = this.mouse.extraData.wheelPos;
-            if (!wheelPos) return;
-            const worldBefore = this.screenToWorld(wheelPos.x, wheelPos.y);
-            const zoomFactor = Math.exp(-this.mouse.wheel * 0.0001);
-            const oldZoom = this.camera.zoom;
-            const newZoom = Math.max(0.05,Math.min(100, oldZoom * zoomFactor));
-            const canvasPos = this.screenToCanvas(wheelPos.x,wheelPos.y);
-            this.camera.zoom = newZoom;
-            this.camera.x = worldBefore.x - canvasPos.x / newZoom;
-            this.camera.y = worldBefore.y - canvasPos.y / newZoom;
-        });
+		this.activeKeys = new Set();
+		this.pausedKeys = new Set();
 
-        this.mouse.hook("touch-pan", "camera-touch-pan", (pos, delta) => {
-            this.camera.x -= delta.dx*2 / this.dpi / this.camera.zoom;
-            this.camera.y -= delta.dy*2 / this.dpi / this.camera.zoom;
-        });
-        this.mouse.hook("touch-pinch", "camera-touch-zoom", (pos, delta) => {
-            this.mouse.extraData.wheelPos = {
-                x: pos.x,
-                y: pos.y
-            };
+		if (this.keyListenersBound) return;
+		this.keyListenersBound = true;
 
-            this.mouse.wheel -= delta * 5;
-        });
-        this.mouse.hook("left-down", "canvas-focus", () => {
-            // if mouse was not in focus, pause other mouse events for 0.5 seconds to prevent accidental drawing
-            if (document.activeElement !== this.canvas) {
-                this.mouse.pause("left", 0.5);
-            }
-            this.canvas.focus();
-        },-1);
-        // add ctrl to auto-focus as well
-        // if we enter canvas with ctrl pressed, focus the canvas
-        this.mouse.hook("mouseenter", "canvas-focus-ctrl", () => {
-            if (this.ctrl) {
-                this.canvas.focus();
-            }
-        });
+		window.addEventListener("keydown", (event) => {
+			if (this.inputContext !== "canvas") return;
+			event.preventDefault();
+			if (this.keyMap[event.key]) {
+				this.activeKeys.add(event.key);
+			}
+		});
 
-        // add engine keybinds
-        if (this.zoomLevel === 0) this.PixelEngine.loadMouse(this.mouse)
-        if (this.zoomLevel === 1) this.TileEngine.loadMouse(this.mouse)
-        if (this.zoomLevel === 2) this.RegionEngine.loadMouse(this.mouse)
-        if (this.zoomLevel === 3) this.SpaceEngine.loadMouse(this.mouse)
-    }
-    loadButtons(){
-        // save map button 
-        const saveMapButton = document.getElementById('saveMapButton');
-        saveMapButton.addEventListener('click', async () => {
-            const canvas_images = [];
-            for (const key in this.map) {
-                const regionX = parseInt(key.split('_')[0]);
-                const regionY = parseInt(key.split('_')[1]);
-                const smallMap = this.map[key]["tiles"];
-                const canvas = document.createElement('canvas');
-                canvas.width = 8 * 32;
-                canvas.height = 8 * 32;
-                const ctx = canvas.getContext('2d');
-                ctx.imageSmoothingEnabled = false;
-                for (let y = 0; y < 8; y++) {
-                    for (let x = 0; x < 8; x++) {
-                        const tileType = smallMap[y][x][0]; // get the tile type, ignoring selected state
-                        if (tileType === "") continue;
-                        const img = this.images[tileType];
-                        if (img) {
-                            ctx.drawImage(img, x * 32, y * 32, 32, 32);
-                        }
-                    }
-                }
-                // scale canvas to 300 dpi so printing is 1 inch = 1 tile
-                const scaledCanvas = document.createElement('canvas');
-                scaledCanvas.width = 8 * 300; // 300 dpi / 96 dpi
-                scaledCanvas.height = 8 * 300;
-                const scaledCtx = scaledCanvas.getContext('2d');
-                scaledCtx.imageSmoothingEnabled = false;
-                scaledCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
-                // add cutout border to scaled canvas
-                scaledCtx.strokeStyle = 'rgba(0, 0, 0, 1)';
-                scaledCtx.lineWidth = 10; // 10 pixels border
-                scaledCtx.strokeRect(0, 0, scaledCanvas.width, scaledCanvas.height);
-                canvas_images.push(scaledCanvas);
-            }
-            // if no regions exist, create a blank canvas
-            if (canvas_images.length === 0) {
-                alert("No regions exist to save. Please draw something on the map before saving.");
-                return;
-            }
-            // if one canvas image, download it directly, otherwise zip them
-            if (canvas_images.length === 1) {
-                const dataURL = canvas_images[0].toDataURL('image/png');
-                const link = document.createElement('a');
-                link.href = dataURL;
-                link.download = 'map.png';
-                link.click();
-            } else {
-                const zipBlob = await zipFiles(...canvas_images);
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(zipBlob);
-                link.download = 'map.zip';
-                link.click();
-            }
-        });
+		window.addEventListener("keyup", (event) => {
+			if (this.inputContext !== "canvas") return;
+			if (this.keyMap[event.key]?.["release-action"]) {
+				this.keyMap[event.key]["release-action"]();
+			}
+			this.activeKeys.delete(event.key);
+			this.pausedKeys.delete(event.key);
+		});
+	}
+	loadMouse(newMouse=false){
+		if (newMouse){
+			this.mouse = new Mouse(this.canvas);
+			this.mouse.attachListeners();
+		}else{
+			this.mouse.unhookAll()
+		}
+		// middle mouse drag to move camera
+		this.mouse.hook("mousemove", "camera-move", (pos,delta) => {
+			if (this.mouse.get("middle")) {
+				this.camera.x -= delta.dx / this.dpi / this.camera.zoom;
+				this.camera.y -= delta.dy / this.dpi / this.camera.zoom;
+			}
+		});
 
-        const saveButton = document.getElementById('saveButton');
-        saveButton.addEventListener('click', () => {
-            this.saver.save(this.images);
-        });
+		// camera zoom with mouse wheel
+		this.mouse.hook("wheel", "camera-zoom", (pos) => {
+			// Store the exact mouse position where the zoom is happening.
+			this.mouse.extraData.wheelPos = {
+				x: pos.x,
+				y: pos.y
+			};
+		});
 
-        const clearSaveButton = document.getElementById('clearSave');
-        clearSaveButton.addEventListener('click', () => {
-            const conformation = document.getElementById("conformation");
-            conformation.classList.remove("hide");
-            const confirmYes = document.getElementById("confirm-yes");
-            const confirmNo = document.getElementById("confirm-no");
-            const overlay = document.getElementById("overlay");
-            overlay.classList.remove("hide");
-            overlay.addEventListener("click", () => {
-                conformation.classList.add("hide");
-                overlay.classList.add("hide");
-            });
-            conformation.focus();
-            confirmYes.addEventListener("click", async () => {
-                await this.saver.clear();
-                window.location.reload();
-            });
-            confirmNo.addEventListener("click", () => {
-                conformation.classList.add("hide");
-                overlay.classList.add("hide");
-            });
-            conformation.addEventListener("blur", () => {
-                conformation.classList.add("hide");
-                this.mouse.pause("left", 0.5)
-                overlay.classList.add("hide");
-            });
-        });
+		this.mouse.hook("wheel-update", "camera-zoom-update", () => {
+			const wheelPos = this.mouse.extraData.wheelPos;
+			if (!wheelPos) return;
+			const worldBefore = this.screenToWorld(wheelPos.x, wheelPos.y);
+			const zoomFactor = Math.exp(-this.mouse.wheel * 0.0001);
+			const oldZoom = this.camera.zoom;
+			const newZoom = Math.max(0.05,Math.min(100, oldZoom * zoomFactor));
+			const canvasPos = this.screenToCanvas(wheelPos.x,wheelPos.y);
+			this.camera.zoom = newZoom;
+			this.camera.x = worldBefore.x - canvasPos.x / newZoom;
+			this.camera.y = worldBefore.y - canvasPos.y / newZoom;
+		});
 
-        // save json button
-        const saveJsonButton = document.getElementById('saveJSONButton');
-        saveJsonButton.addEventListener('click', () => {
-            const json = JSON.stringify({
-                map: this.map,
-                notes: this.notes,
-                camera: this.camera,
-                config: this.config,
-                zoomLevel: this.zoomLevel,
-                annotations: this.annotations
-            });
+		this.mouse.hook("touch-pan", "camera-touch-pan", (pos, delta) => {
+			this.camera.x -= delta.dx*2 / this.dpi / this.camera.zoom;
+			this.camera.y -= delta.dy*2 / this.dpi / this.camera.zoom;
+		});
+		this.mouse.hook("touch-pinch", "camera-touch-zoom", (pos, delta) => {
+			this.mouse.extraData.wheelPos = {
+				x: pos.x,
+				y: pos.y
+			};
 
-            const blob = new Blob([json], { type: 'application/json' });
+			this.mouse.wheel -= delta * 5;
+		});
 
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'map.json';
-            link.click();
-        });
-        // load json button
-        const loadJsonButton = document.getElementById('loadJSONButton');
-        loadJsonButton.addEventListener('click', () => {
-            const input = document.createElement('input');
+		// add engine keybinds
+		if (this.zoomLevel === 0) this.PixelEngine.loadMouse(this.mouse)
+		if (this.zoomLevel === 1) this.TileEngine.loadMouse(this.mouse)
+		if (this.zoomLevel === 2) this.RegionEngine.loadMouse(this.mouse)
+		if (this.zoomLevel === 3) this.SpaceEngine.loadMouse(this.mouse)
+	}
+	
 
-            input.type = 'file';
-            input.accept = '.json';
+	/**
+	 * Updates the input context from a pointer position.
+	 *
+	 * @param {number} x
+	 * @param {number} y
+	 */
+	updateInputContext(x, y) {
+		const element = document.elementFromPoint(x, y);
 
-            input.addEventListener('change', (e) => {
-                const file = e.target.files[0];
+		if (element === this.canvas || element?.closest("#mapCanvas") === this.canvas) {
+			this.inputContext = "canvas";
+			return;
+		}
 
-                const reader = new FileReader();
+		if (isUIElement(element)) {
+			this.inputContext = "ui";
+			return;
+		}
 
-                reader.onload = (e) => {
-                    const save = JSON.parse(e.target.result);
+		this.inputContext = null;
+	}
 
-                    if (save.map) this.map = save.map;
-                    if (save.notes) this.notes = save.notes;
-                    else this.notes = {};
-                    if (save.camera) this.camera = save.camera;
-                    if (save.config) this.config = save.config;
-                    if (save.zoomLevel) this.zoomLevel = save.zoomLevel;
-                    if (save.annotations) this.annotations = save.annotations;
-                    else this.regionTypes = new Map();
-                    
-                    // normalize old map formats
-                    for (const key in this.map) {
-                        for (let row = 0; row < 8; row++) {
-                            for (let col = 0; col < 8; col++) {
-                                const tile = this.map[key]["tiles"][row][col];
-                                if (typeof tile === "string" && tile !== "") {
-                                    this.map[key]["tiles"][row][col] = [tile, ""];
-                                }
-                            }
-                        }
-                    }
-                    console.log("Loaded map:", this.map);
-                    console.log("Loaded notes:", this.notes);
-                };
+	/**
+	 * Tracks pointer position and determines the active input context.
+	 *
+	 * @param {PointerEvent} event
+	 */
+	handlePointerMove(event) {
+		this.pointerPosition = {
+			x: event.clientX,
+			y: event.clientY
+		};
 
-                reader.readAsText(file);
-            });
+		this.updateInputContext(event.clientX, event.clientY);
+	}
 
-            input.click();
-        });
+	/**
+	 * Restores input context after returning to the application window.
+	 */
+	restoreInputContext() {
+		if (!this.pointerPosition) {
+			this.inputContext = null;
+			return;
+		}
 
-        const rasterizeButton = document.getElementById("Rasterize");
-        rasterizeButton.addEventListener("click", () => {
-            this.rebuildRegionTypes();
-        });
+		this.updateInputContext(
+			this.pointerPosition.x,
+			this.pointerPosition.y
+		);
+	}
 
-        const closeInstructionsButton = document.getElementById("close-instructions");
-        closeInstructionsButton.addEventListener("click", () => {
-            // if instructions are open, close them, change the button text to "Open Instructions"
-            // toggle 'hide' class
-            const instructions = document.getElementById("instructions");
-            instructions.classList.toggle("hide");
-            if (instructions.classList.contains("hide")) {
-                closeInstructionsButton.textContent = "Open Information";
-            } else {
-                closeInstructionsButton.textContent = "Close Information";
-            }
-        });
-    }
-    draw(){
-        this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
-        
-        
-        // apply camera zoom
-        this.ctx.scale(this.camera.zoom, this.camera.zoom);
-        // apply dpi scaling
-        this.ctx.scale(this.dpi, this.dpi);
-        // apply camera transform
-        this.ctx.translate(-this.camera.x, -this.camera.y);
+	/**
+	 * Initializes application input-context tracking.
+	 */
+	bindInputContext() {
+		document.addEventListener("pointermove", (event) => {
+			this.handlePointerMove(event);
+		});
 
-        
+		window.addEventListener("blur", () => {
+			this.inputContext = null;
+			this.activeKeys.clear();
+			this.pausedKeys.clear();
 
-        if (this.zoomLevel === 0) {
-            this.PixelEngine.render();
-        }
-        if (this.zoomLevel === 1) {
-            this.TileEngine.render();
-        }
-        if (this.zoomLevel === 2) {
-            this.RegionEngine.render();
-        }
-        if (this.zoomLevel === 3) {
-            this.SpaceEngine.render();
-        }
-    }
-    update(){
-        this.mouse.update();
-        // update keymap
-        for (const key of this.activeKeys) {
-            if (this.keyMap[key] && !this.pausedKeys.has(key)) {
-                this.keyMap[key]["action"]();
-            }
-            if (this.keyMap[key] && this.keyMap[key]["type"] === "tap") {
-                this.pausedKeys.add(key);
-            }
+			this.shift = false;
+			this.alt = false;
+			this.ctrl = false;
+		});
 
-        }
-        this.updateCamera();
+		window.addEventListener("focus", () => {
+			this.restoreInputContext();
+		});
+	}
+	loadButtons(){
+		// save map button 
+		const saveMapButton = document.getElementById('saveMapButton');
+		saveMapButton.addEventListener('click', async () => {
+			const canvas_images = [];
+			for (const key in this.map) {
+				const regionX = parseInt(key.split('_')[0]);
+				const regionY = parseInt(key.split('_')[1]);
+				const smallMap = this.map[key]["tiles"];
+				const canvas = document.createElement('canvas');
+				canvas.width = 8 * 32;
+				canvas.height = 8 * 32;
+				const ctx = canvas.getContext('2d');
+				ctx.imageSmoothingEnabled = false;
+				for (let y = 0; y < 8; y++) {
+					for (let x = 0; x < 8; x++) {
+						const tileType = smallMap[y][x][0]; // get the tile type, ignoring selected state
+						if (tileType === "") continue;
+						const img = this.images[tileType];
+						if (img) {
+							ctx.drawImage(img, x * 32, y * 32, 32, 32);
+						}
+					}
+				}
+				// scale canvas to 300 dpi so printing is 1 inch = 1 tile
+				const scaledCanvas = document.createElement('canvas');
+				scaledCanvas.width = 8 * 300; // 300 dpi / 96 dpi
+				scaledCanvas.height = 8 * 300;
+				const scaledCtx = scaledCanvas.getContext('2d');
+				scaledCtx.imageSmoothingEnabled = false;
+				scaledCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+				// add cutout border to scaled canvas
+				scaledCtx.strokeStyle = 'rgba(0, 0, 0, 1)';
+				scaledCtx.lineWidth = 10; // 10 pixels border
+				scaledCtx.strokeRect(0, 0, scaledCanvas.width, scaledCanvas.height);
+				canvas_images.push(scaledCanvas);
+			}
+			// if no regions exist, create a blank canvas
+			if (canvas_images.length === 0) {
+				alert("No regions exist to save. Please draw something on the map before saving.");
+				return;
+			}
+			// if one canvas image, download it directly, otherwise zip them
+			if (canvas_images.length === 1) {
+				const dataURL = canvas_images[0].toDataURL('image/png');
+				const link = document.createElement('a');
+				link.href = dataURL;
+				link.download = 'map.png';
+				link.click();
+			} else {
+				const zipBlob = await zipFiles(...canvas_images);
+				const link = document.createElement('a');
+				link.href = URL.createObjectURL(zipBlob);
+				link.download = 'map.zip';
+				link.click();
+			}
+		});
 
-        
-        // Zoom levels. [Pixel scope, Tile scope, Region scope]
-        const zoomLevels = [20, 0.7, 0.2];
-        const prevZoomLevel = this.zoomLevel;
-        if (this.camera.zoom >= zoomLevels[0]) {
-            this.zoomLevel = 0;
-            this.PixelEngine.update();
-        } else if (this.camera.zoom >= zoomLevels[1]) {
-            this.zoomLevel = 1; // Tile scope
-            this.TileEngine.update();
-        } else if (this.camera.zoom >= zoomLevels[2]) {
-            this.zoomLevel = 2; // Region scope
-            this.RegionEngine.update();
-        } else {
-            this.zoomLevel = 3; // Space scope
-            this.SpaceEngine.update();
-        }
-        if (prevZoomLevel!==this.zoomLevel){
-            console.log("swapping engine")
-            this.loadKeymap()
-            this.loadMouse()
+		const saveButton = document.getElementById('saveButton');
+		saveButton.addEventListener('click', () => {
+			this.saver.save(this.images);
+		});
 
-            // if going to tile scope, change color slider to selected annotate color
-            if (this.zoomLevel === 1) {
-                this.colorSliderEvent(this.config.annotate_color, true, false);
-            } else {
-                this.colorSliderEvent(this.config.selectedColor, false, true);
-            }
-            // if going to pixel scope, change color slider to selected color
-            if (this.zoomLevel === 0) {
-                this.colorSliderEvent(this.config.selectedColor, false, true);
-            }
-        }
-    }
-    updateCamera(){
-        // update camera
-        this.camera.x += this.camera.vx;
-        this.camera.y += this.camera.vy;
-        // multiply camera velocity by 0.9 to slow down over time
-        this.camera.vx *= 0.9;
-        this.camera.vy *= 0.9;
-    }
-    screenToCanvas(x, y) {
-        const rect = this.canvas.getBoundingClientRect();
+		const clearSaveButton = document.getElementById('clearSave');
+		clearSaveButton.addEventListener('click', () => {
+			const conformation = document.getElementById("conformation");
+			conformation.classList.remove("hide");
+			const confirmYes = document.getElementById("confirm-yes");
+			const confirmNo = document.getElementById("confirm-no");
+			const overlay = document.getElementById("overlay");
+			overlay.classList.remove("hide");
+			overlay.addEventListener("click", () => {
+				conformation.classList.add("hide");
+				overlay.classList.add("hide");
+			});
+			conformation.focus();
+			confirmYes.addEventListener("click", async () => {
+				await this.saver.clear();
+				window.location.reload();
+			});
+			confirmNo.addEventListener("click", () => {
+				conformation.classList.add("hide");
+				overlay.classList.add("hide");
+			});
+			conformation.addEventListener("blur", () => {
+				conformation.classList.add("hide");
+				this.mouse.pause("left", 0.5)
+				overlay.classList.add("hide");
+			});
+		});
 
-        const physicalX =
-            (x - rect.left) * (this.canvas.width / rect.width);
+		// save json button
+		const saveJsonButton = document.getElementById('saveJSONButton');
+		saveJsonButton.addEventListener('click', () => {
+			const json = JSON.stringify({
+				map: this.map,
+				notes: this.notes,
+				camera: this.camera,
+				config: this.config,
+				zoomLevel: this.zoomLevel,
+				annotations: this.annotations
+			});
 
-        const physicalY =
-            (y - rect.top) * (this.canvas.height / rect.height);
+			const blob = new Blob([json], { type: 'application/json' });
 
-        return {
-            x: physicalX / this.dpi,
-            y: physicalY / this.dpi
-        };
-    }
-    screenToWorld(x, y) {
-        const canvasPos = this.screenToCanvas(x, y);
+			const link = document.createElement('a');
+			link.href = URL.createObjectURL(blob);
+			link.download = 'map.json';
+			link.click();
+		});
+		// load json button
+		const loadJsonButton = document.getElementById('loadJSONButton');
+		loadJsonButton.addEventListener('click', () => {
+			const input = document.createElement('input');
 
-        return {
-            x: canvasPos.x / this.camera.zoom + this.camera.x,
-            y: canvasPos.y / this.camera.zoom + this.camera.y
-        };
-    }
-    getBounds() {
-        const width = (this.canvas.width / this.dpi) / this.camera.zoom;
+			input.type = 'file';
+			input.accept = '.json';
 
-        const height = (this.canvas.height / this.dpi) / this.camera.zoom;
+			input.addEventListener('change', (e) => {
+				const file = e.target.files[0];
 
-        return {
-            left: this.camera.x,
-            right: this.camera.x + width,
-            top: this.camera.y,
-            bottom: this.camera.y + height
-        };
-    }
-    save(){
-        // save the current map
-        this.saver.save({
-            map: this.map,
-            camera: this.camera,
-            config: this.config,
-            notes: this.notes,
-            zoomLevel: this.zoomLevel,
-            regionTypes: Array.from(this.regionTypes.entries())
-        });
-        return;
-    }
-    rebuildRegionTypes() {
-        this.regionTypes.clear();
+				const reader = new FileReader();
 
-        for (const key in this.map) {
-            const tiles = this.map[key].tiles;
-            const hash = hashTiles(tiles);
+				reader.onload = (e) => {
+					const save = JSON.parse(e.target.result);
 
-            const existing = this.regionTypes.get(hash);
+					if (save.map) this.map = save.map;
+					if (save.notes) this.notes = save.notes;
+					else this.notes = {};
+					if (save.camera) this.camera = save.camera;
+					if (save.config) this.config = save.config;
+					if (save.zoomLevel) this.zoomLevel = save.zoomLevel;
+					if (save.annotations) this.annotations = save.annotations;
+					else this.regionTypes = new Map();
+					
+					// normalize old map formats
+					for (const key in this.map) {
+						for (let row = 0; row < 8; row++) {
+							for (let col = 0; col < 8; col++) {
+								const tile = this.map[key]["tiles"][row][col];
+								if (typeof tile === "string" && tile !== "") {
+									this.map[key]["tiles"][row][col] = [tile, ""];
+								}
+							}
+						}
+					}
+					console.log("Loaded map:", this.map);
+					console.log("Loaded notes:", this.notes);
+				};
 
-            if (existing) {
-                existing.count++;
-            } else {
-                this.regionTypes.set(hash, {
-                    count: 1,
-                    tiles: tiles.map(row =>
-                        row.map(tile =>
-                            Array.isArray(tile) ? [...tile] : tile
-                        )
-                    )
-                });
-            }
-        }
+				reader.readAsText(file);
+			});
 
-        // Make sure default is available even if no actual region uses it
-        if (!this.regionTypes.has(this.defaultRegionHash)) {
-            this.regionTypes.set(this.defaultRegionHash, {
-                count: 0,
-                tiles: this.defaultRegion.map(row => [...row])
-            });
-        }
-        // If selectedRegionType is no longer valid, reset it to default
-        if (!this.regionTypes.has(this.config.selectedRegionType)) {
-            this.config.selectedRegionType = this.defaultRegionHash;
-        }
-    }
-    
+			input.click();
+		});
+
+		const rasterizeButton = document.getElementById("Rasterize");
+		rasterizeButton.addEventListener("click", () => {
+			this.rebuildRegionTypes();
+		});
+
+		const closeInstructionsButton = document.getElementById("close-instructions");
+		closeInstructionsButton.addEventListener("click", () => {
+			// if instructions are open, close them, change the button text to "Open Instructions"
+			// toggle 'hide' class
+			const instructions = document.getElementById("instructions");
+			instructions.classList.toggle("hide");
+			if (instructions.classList.contains("hide")) {
+				closeInstructionsButton.textContent = "Open Information";
+			} else {
+				closeInstructionsButton.textContent = "Close Information";
+			}
+		});
+	}
+	draw(){
+		this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+		
+		
+		// apply camera zoom
+		this.ctx.scale(this.camera.zoom, this.camera.zoom);
+		// apply dpi scaling
+		this.ctx.scale(this.dpi, this.dpi);
+		// apply camera transform
+		this.ctx.translate(-this.camera.x, -this.camera.y);
+
+		
+
+		if (this.zoomLevel === 0) {
+			this.PixelEngine.render();
+		}
+		if (this.zoomLevel === 1) {
+			this.TileEngine.render();
+		}
+		if (this.zoomLevel === 2) {
+			this.RegionEngine.render();
+		}
+		if (this.zoomLevel === 3) {
+			this.SpaceEngine.render();
+		}
+	}
+	createToolbar(){
+		const toolbar = document.getElementById("toolbar");
+		const selectButton = document.getElementById("select");
+		selectButton.addEventListener("click", () => {
+			let action = "enable-selection";
+			if (this.zoomLevel === 1 && !this.config.selectionExists) action = "enable-selection";
+			else if (this.zoomLevel === 2 && !this.config.regionSelectionExists) action = "enable-selection";
+			else if (this.zoomLevel === 3 && !this.config.regionSelectionExists) action = "enable-selection";
+			else if (this.zoomLevel === 1 && this.config.selectionExists) action = "tile-disable-selection";
+			else if (this.zoomLevel === 2 && this.config.regionSelectionExists) action = "region-disable-selection";
+			else if (this.zoomLevel === 3 && this.config.regionSelectionExists) action = "region-disable-selection";
+			
+			// if nothing is selected, just toggle alt release action
+			if (action === "enable-selection" && this.config.alt) {
+				console.log("Toggling alt release action");
+				this.keyMap["Alt"]["release-action"]();
+				return;
+			}
+			switch (action) {
+				case "enable-selection":
+					this.keyMap["Alt"]["action"]();
+					console.log(this.config.alt)
+					break;
+				case "tile-disable-selection":
+					this.keyMap["Alt"]["release-action"]();
+					this.TileEngine.deselectAll();
+					break;
+				case "region-disable-selection":
+					this.RegionEngine.deselectAll();
+					this.keyMap["Alt"]["release-action"]();
+					break;
+			}
+
+		});
+		const pickButton = document.getElementById("eyedrop");
+		pickButton.addEventListener("click", () => {
+			if (this.config.ctrl) {
+				// remove hook - cancel
+				this.mouse.unhook("left-down","eyedrop");
+				this.keyMap["Control"]["release-action"]();
+				this.config.ctrl = false;
+				return;
+			}
+			this.config.ctrl = true;
+			this.mouse.weakHook("left-down","eyedrop", (pos, event) => {
+				event.consume();
+				this.keyMap["Control"]["action"]();
+				this.keyMap["Control"]["release-action"]();
+				this.mouse.pause("left-hold", 0.5);
+				this.mouse.pause("left-down", 0.5);
+			}, "low");
+			
+		});
+		const fillButton = document.getElementById("fill");
+		fillButton.addEventListener("click", () => {
+			if (this.config.fill) {
+				// remove hook - cancel
+				this.mouse.unhook("left-down","fill");
+				this.config.fill = false;
+				return;
+			}
+			this.config.fill = true;
+			this.mouse.weakHook("left-down","fill", (pos, event) => {
+				event.consume();
+				this.keyMap["f"]["action"]();
+				this.config.fill = false;
+				this.mouse.pause("left-hold", 0.5);
+				this.mouse.pause("left-down", 0.5);
+			}, "low");
+		});
+		const outlineButton = document.getElementById("outline");
+		outlineButton.addEventListener("click", () => {
+			this.keyMap["o"]["action"]();
+		});
+		const groupButton = document.getElementById("group");
+		groupButton.addEventListener("click", () => {
+			this.keyMap["g"]["action"]();
+		});
+		const copyButton = document.getElementById("copy");
+		copyButton.addEventListener("click", () => {
+			copyButton.classList.add("toggled");
+			copyButton.textContent = "Pick Origin";
+			function copy(pos, event){
+				event.consume();
+				this.keyMap["c"]["action"]();
+				this.clipboard.origin = pos;
+				copyButton.classList.remove("toggled");
+				copyButton.textContent = "Copied!";
+				setTimeout(() => {
+					copyButton.textContent = "Copy";
+				}, 500);
+			}
+			this.mouse.weakHook("left-hold","copy", copy, "low", this);
+		});
+		const pasteButton = document.getElementById("paste");
+		pasteButton.addEventListener("click", () => {
+			this.keyMap["v"]["action"]();
+
+			// need to lock mouse pos & pause when user clicks
+			this.mouse.hook("left-down","paste-lock",(pos,event)=>{
+				this.mouse.unlockPos();
+				this.mouse.pause("left-hold");
+				this.mouse.pause("left-down");
+				
+				this.mouse.weakHook("left-up","paste-unlock",()=>{
+					this.mouse.lockPos();
+					this.mouse.pause("left-hold",1);
+					this.mouse.pause("left-down",1);
+				});
+			},-100)
+		});
+		const pasteExclamationButton = document.getElementById("paste!");
+		pasteExclamationButton.addEventListener("click", () => {
+			this.keyMap["v"]["action"]();
+			this.mouse.unlockPos();
+			this.mouse.unhook("left-down","paste-lock");
+		});
+		const cancelPasteButton = document.getElementById("cancel-paste");
+		cancelPasteButton.addEventListener("click", () => {
+			if (this.zoomLevel === 1) {
+				this.mouse.runAction("right-hold", "tile-clipboard-preview");
+			}
+			if (this.zoomLevel === 2) {
+				this.mouse.runAction("right-hold", "region-clipboard-preview");
+			}
+			this.mouse.unlockPos();
+			this.mouse.unhook("left-down","paste-lock");
+		});
+		const annotateButton = document.getElementById("annotate");
+		annotateButton.addEventListener("click", () => {
+			this.keyMap["a"]["action"]();
+		});
+		const eraseButton = document.getElementById("erase");
+		eraseButton.addEventListener("click", () => {
+			// toggle erase mode
+			this.config.erase = !this.config.erase;
+		});
+		const sizeButton = document.getElementById("brushSize");
+		sizeButton.addEventListener("click", () => {
+			this.config.brushSize = (this.config.brushSize % 9) + 1;
+			sizeButton.textContent = "Set to:" + this.config.brushSize;
+			setTimeout(() => {
+				sizeButton.textContent = "Size:" + this.config.brushSize;
+			}, 500);
+		});
+		const undoButton = document.getElementById("undo");
+		undoButton.addEventListener("click", () => {
+			// remove last annotation
+			// remove note attached to the last annotation
+			if (this.annotations.length > 0) {
+				const lastAnnotation = this.annotations[this.annotations.length - 1];
+				if (lastAnnotation.note) {
+					this.config.notes = this.config.notes.filter(note => note !== lastAnnotation.note);
+				}
+			}
+			this.annotations.pop();
+		});
+	}
+	updateToolbar(){
+		const toolbar = document.getElementById("toolbar");
+		// select button
+		function updateSelectButton() {
+			const selectButton = document.getElementById("select");
+			// Hide
+			let hidden = false;
+			if (this.zoomLevel === 0) hidden = true;
+			if (this.zoomLevel === 1 && this.config.annotate) hidden = true;
+			if (this.config.showPreview) hidden = true;
+
+			if (!hidden) selectButton.classList.remove("hide");
+			else  selectButton.classList.add("hide");
+			
+			// If there is selected tiles, show the select button as deselect
+			if (this.config.alt){
+				selectButton.classList.add("toggled");
+				selectButton.textContent = "Deselect";
+			} else {
+				selectButton.classList.remove("toggled");
+				selectButton.textContent = "Select";
+			}
+
+			this.config.buttonSelectState = hidden;
+		}
+		// pick a tile
+		function updatePickButton() {
+			const button = document.getElementById("eyedrop");
+			// Hide
+			let hidden = false;
+			if (this.zoomLevel === 1 && this.config.selectionExists) hidden = true;
+			if (this.config.showPreview) hidden = true;
+
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+			
+			let on = false;
+			if (this.config.ctrl) on = true;
+
+			if (on) button.classList.add("toggled");
+			else button.classList.remove("toggled");
+
+			this.config.buttonPickState = hidden;
+		}
+		// fill
+		function updateFillButton() {
+			const button = document.getElementById("fill");
+			// Hide
+			let hidden = false;
+			if (this.zoomLevel === 2) hidden = true;
+			if (this.zoomLevel === 3) hidden = true;
+			if (this.config.annotate) hidden = true;
+			if (this.config.showPreview) hidden = true;
+
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+			
+			let on = false;
+			if (this.config.fill) on = true;
+
+			if (on) button.classList.add("toggled");
+			else button.classList.remove("toggled");
+
+			// if selection, change text to "Fill selection"
+			if (this.config.selectionExists && this.zoomLevel === 1) button.textContent = "Fill Selection";
+			else if (this.config.regionSelectionExists && (this.zoomLevel === 2 || this.zoomLevel === 3)) button.textContent = "Fill Selection";
+			else button.textContent = "Fill";
+
+			this.config.buttonFillState = hidden;
+		}
+		// annotate
+		function updateAnnotateButton() {
+			const button = document.getElementById("annotate");
+			// Hide
+			let hidden = false;
+			if (this.zoomLevel === 0) hidden = true;
+			if (this.zoomLevel === 1 && this.config.selectionExists) hidden = true;
+			if (this.zoomLevel === 2) hidden = true;
+			if (this.zoomLevel === 3) hidden = true;
+			if (this.config.showPreview) hidden = true;
+
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+			
+			let on = false;
+			if (this.config.annotate) on = true;
+
+			if (on) button.classList.add("toggled");
+			else button.classList.remove("toggled");
+
+			this.config.buttonAnnotateState = hidden;
+		}
+		function updateEraseButton() {
+			const button = document.getElementById("erase");
+			// Hide
+			let hidden = false;
+			if (this.config.showPreview) hidden = true;
+
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+			
+			let on = false;
+			if (this.config.erase) on = true;
+
+			if (on) button.classList.add("toggled");
+			else button.classList.remove("toggled");
+
+			this.config.buttonEraseState = hidden;
+		}
+		// undo annotate
+		function updateUndoAnnotateButton() {
+			const button = document.getElementById("undo");
+			// Hide
+			let hidden = false;
+			if (this.zoomLevel === 0) hidden = true;
+			if (this.zoomLevel === 1 && !this.config.annotate) hidden = true;
+			if (this.zoomLevel === 2) hidden = true;
+			if (this.zoomLevel === 3) hidden = true;
+			if (this.config.showPreview) hidden = true;
+
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+			this.config.buttonUndoAnnotateState = hidden;
+		}
+
+		// outline
+		function updateOutlineButton() {
+			const button = document.getElementById("outline");
+			// Hide
+			let hidden = false;
+			if (this.zoomLevel === 0) hidden = true;
+			if (this.zoomLevel === 1 && !this.config.selectionExists) hidden = true;
+			if (this.zoomLevel === 2) hidden = true;
+			if (this.zoomLevel === 3) hidden = true;
+			if (this.config.showPreview) hidden = true;
+
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+
+			this.config.buttonOutlineState = hidden;
+		}
+		// group
+		function updateGroupButton() {
+			const button = document.getElementById("group");
+			// Hide
+			let hidden = false;
+			if (this.zoomLevel === 0) hidden = true;
+			if (this.zoomLevel === 1) hidden = true;
+			if (this.zoomLevel === 2 && !this.config.regionSelectionExists) hidden = true;
+			if (this.zoomLevel === 3) hidden = true;
+			if (this.config.showPreview) hidden = true;
+
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+
+			this.config.buttonGroupState = hidden;
+		}
+		// copy
+		function updateCopyButton() {
+			const button = document.getElementById("copy");
+			// Hide
+			let hidden = false;
+			if (this.zoomLevel === 0) hidden = true;
+			if (this.zoomLevel === 1 && !this.config.selectionExists) hidden = true;
+			if (this.zoomLevel === 2 && !this.config.regionSelectionExists) hidden = true;
+			if (this.zoomLevel === 3) hidden = true;
+			if (this.config.showPreview) hidden = true;
+			
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+
+			this.config.buttonCopyState = hidden;
+		}
+		// cut
+		function updateCutButton() {
+			const button = document.getElementById("cut");
+			// Hide
+			let hidden = false;
+			if (this.zoomLevel === 0) hidden = true;
+			if (this.zoomLevel === 1 && !this.config.selectionExists) hidden = true;
+			if (this.zoomLevel === 2 && !this.config.regionSelectionExists) hidden = true;
+			if (this.zoomLevel === 3) hidden = true;
+			if (this.config.showPreview) hidden = true;
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+
+			this.config.buttonCutState = hidden;
+		}
+		// paste 
+		function updatePasteButton() { // the button to show paste preview
+			const button = document.getElementById("paste");
+			// Hide
+			let hidden = false;
+			if (this.zoomLevel === 0) hidden = true;
+			if (this.zoomLevel === 1 && !this.clipboard?.tiles?.length) hidden = true;
+			if (this.zoomLevel === 2 && !this.clipboard?.regions?.length) hidden = true;
+			if (this.zoomLevel === 3) hidden = true;
+			if (this.config.showPreview) hidden = true;
+			if (this.annotate) hidden = true;
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+
+			this.config.buttonPasteState = hidden;
+		}
+		function updatePasteExclamationButton() { // actually paste
+			const button = document.getElementById("paste!");
+			// Hide
+			let hidden = false;
+			if (!this.config.showPreview) hidden = true;
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+
+			this.config.buttonPasteExclamationState = hidden;
+		}
+		function updateCancelPasteButton() { // cancel the current action
+			const button = document.getElementById("cancel-paste");
+			// Hide
+			let hidden = false;
+			if (!this.config.showPreview) hidden = true;
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+
+			this.config.buttonCancelPasteState = hidden;
+		}
+		function updateSizeButton() { // update the size button
+			const button = document.getElementById("brushSize");
+			// Hide
+			let hidden = false;
+			if (this.config.showPreview) hidden = true;
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+
+			this.config.buttonSizeState = hidden;
+		}
+		// Update all buttons
+		updateSelectButton.call(this);
+		updatePickButton.call(this);
+		updateFillButton.call(this);
+		updateAnnotateButton.call(this);
+		updateUndoAnnotateButton.call(this);
+		updateGroupButton.call(this);
+		updateOutlineButton.call(this);
+		updateCutButton.call(this);
+		updateCopyButton.call(this);
+		updatePasteButton.call(this);
+		updatePasteExclamationButton.call(this);
+		updateCancelPasteButton.call(this);
+		updateSizeButton.call(this);
+		updateEraseButton.call(this);
+	}
+	update(){
+		this.mouse.update();
+		// update keymap
+		for (const key of this.activeKeys) {
+			if (this.keyMap[key] && !this.pausedKeys.has(key)) {
+				this.keyMap[key]["action"]();
+			}
+			if (this.keyMap[key] && this.keyMap[key]["type"] === "tap") {
+				this.pausedKeys.add(key);
+			}
+		}
+		this.updateCamera();
+		this.updateToolbar();
+		
+		// Zoom levels. [Pixel scope, Tile scope, Region scope]
+		const zoomLevels = [20, 0.7, 0.2];
+		const prevZoomLevel = this.zoomLevel;
+		if (this.camera.zoom >= zoomLevels[0]) {
+			this.zoomLevel = 0;
+			this.PixelEngine.update();
+		} else if (this.camera.zoom >= zoomLevels[1]) {
+			this.zoomLevel = 1; // Tile scope
+			this.TileEngine.update();
+		} else if (this.camera.zoom >= zoomLevels[2]) {
+			this.zoomLevel = 2; // Region scope
+			this.RegionEngine.update();
+		} else {
+			this.zoomLevel = 3; // Space scope
+			this.SpaceEngine.update();
+		}
+		if (prevZoomLevel!==this.zoomLevel){
+			console.log("swapping engine")
+			this.loadKeymap()
+			this.loadMouse()
+
+			// if going to tile scope, change color slider to selected annotate color
+			if (this.zoomLevel === 1) {
+				this.colorSliderEvent(this.config.annotate_color, true, false);
+			} else {
+				this.colorSliderEvent(this.config.selectedColor, false, true);
+			}
+			// if going to pixel scope, change color slider to selected color
+			if (this.zoomLevel === 0) {
+				this.colorSliderEvent(this.config.selectedColor, false, true);
+			}
+		}
+		let hide = false;
+		if (this.zoomLevel === 2 || this.zoomLevel === 3) hide = true;
+		if (this.zoomLevel === 1 && !this.config.annotate) hide = true;
+		const slider = document.getElementById("colorSlider");
+		if (hide){
+			slider.classList.add("hide");
+		}else{
+			slider.classList.remove("hide");
+		}
+
+		// cursor 
+		if (this.mouse.isPaused("left")) this.canvas.style.cursor = "grabbing";
+		else if (this.config.ctrl) this.canvas.style.cursor = "crosshair";
+		else if (this.config.fill) this.canvas.style.cursor = "crosshair";
+		else if (this.config.erase) this.canvas.style.cursor = "grabbing";
+		else this.canvas.style.cursor = "default";
+	}
+	updateCamera(){
+		// update camera
+		this.camera.x += this.camera.vx;
+		this.camera.y += this.camera.vy;
+		// multiply camera velocity by 0.9 to slow down over time
+		this.camera.vx *= 0.9;
+		this.camera.vy *= 0.9;
+	}
+	screenToCanvas(x, y) {
+		const rect = this.canvas.getBoundingClientRect();
+
+		const physicalX =
+			(x - rect.left) * (this.canvas.width / rect.width);
+
+		const physicalY =
+			(y - rect.top) * (this.canvas.height / rect.height);
+
+		return {
+			x: physicalX / this.dpi,
+			y: physicalY / this.dpi
+		};
+	}
+	screenToWorld(x, y) {
+		const canvasPos = this.screenToCanvas(x, y);
+
+		return {
+			x: canvasPos.x / this.camera.zoom + this.camera.x,
+			y: canvasPos.y / this.camera.zoom + this.camera.y
+		};
+	}
+	getBounds() {
+		const width = (this.canvas.width / this.dpi) / this.camera.zoom;
+
+		const height = (this.canvas.height / this.dpi) / this.camera.zoom;
+
+		return {
+			left: this.camera.x,
+			right: this.camera.x + width,
+			top: this.camera.y,
+			bottom: this.camera.y + height
+		};
+	}
+	save(){
+		// save the current map
+		this.saver.save({
+			map: this.map,
+			camera: this.camera,
+			config: this.config,
+			notes: this.notes,
+			zoomLevel: this.zoomLevel,
+			regionTypes: Array.from(this.regionTypes.entries())
+		});
+		return;
+	}
+	rebuildRegionTypes() {
+		this.regionTypes.clear();
+
+		for (const key in this.map) {
+			const tiles = this.map[key].tiles;
+			const hash = hashTiles(tiles);
+
+			const existing = this.regionTypes.get(hash);
+
+			if (existing) {
+				existing.count++;
+			} else {
+				this.regionTypes.set(hash, {
+					count: 1,
+					tiles: tiles.map(row =>
+						row.map(tile =>
+							Array.isArray(tile) ? [...tile] : tile
+						)
+					)
+				});
+			}
+		}
+
+		// Make sure default is available even if no actual region uses it
+		if (!this.regionTypes.has(this.defaultRegionHash)) {
+			this.regionTypes.set(this.defaultRegionHash, {
+				count: 0,
+				tiles: this.defaultRegion.map(row => [...row])
+			});
+		}
+		// If selectedRegionType is no longer valid, reset it to default
+		if (!this.regionTypes.has(this.config.selectedRegionType)) {
+			this.config.selectedRegionType = this.defaultRegionHash;
+		}
+	}
+	
 }
-document.addEventListener('DOMContentLoaded', async () => {
-    const mapMaker = new MapMaker();
-    await mapMaker.load();
-    mapMaker.loop();
-    // ensure the canvas is focused so that key events are captured
-    mapMaker.canvas.tabIndex = 0;
-    mapMaker.canvas.focus();
+document.addEventListener("DOMContentLoaded", async () => {
+	const mapMaker = new MapMaker();
+	await mapMaker.load();
+	mapMaker.loop();
 });
 
+
+/**
+ * Determines whether an element belongs to the application's UI.
+ *
+ * @param {Element|null} element
+ * @returns {boolean}
+ */
+function isUIElement(element) {
+	if (!element) return false;
+
+	return Boolean(element.closest(
+		"#toolbar, #buttonContainer, #instructions, #close-instructions, #overlay, #conformation"
+	));
+}

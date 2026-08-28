@@ -252,8 +252,8 @@
         </aside>
         <button id="close-instructions">Close Information</button>
         <aside id="notes" class="">
-            <header>Notes</header>
-            <main>
+            <header id="notesHeader">Notes</header>
+            <main id="notesMain">
                 <section class="noteControls" id="mainNoteControls">
                     <button id="note-nothing" class="hide" tooltip="No note selected.">(:</button>
                     <button id="note-back" class="hide" tooltip="Go back">Back</button>
@@ -292,6 +292,23 @@
                 </section>
             </main>
         </aside>
+        <fieldset id="toolbar">
+            <legend>Toolbar</legend>
+            <button id="erase" class="">Erase</button>
+            <button id="select" class="">Select</button>
+            <button id="eyedrop" class="">Pick</button>
+            <button id="fill" class="">Fill</button>
+            <button id="annotate" class="">Annotate</button>
+            <button id="undo" class="">Undo</button>
+            <button id="outline" class="hide">Outline</button>
+            <button id="group" class="hide">Group</button>
+            <button id="cut" class="hide">Cut</button>
+            <button id="copy" class="hide">Copy</button>
+            <button id="paste" class="hide">Paste</button>
+            <button id="paste!" class="hide">Paste!!!</button>
+            <button id="cancel-paste" class="hide">Cancel</button>
+            <button id="brushSize" class="">Size</button>
+        </fieldset>
         <div id="overlay" class="hide"></div>
         <menu id="conformation" class="hide">
             <h2>Are you sure?</h2>

@@ -19,6 +19,25 @@
 
     font-weight: bold;
     text-align: center;
+
+    touch-action: manipulation;
+    pointer-events: auto;
+    user-select: none;
+    
+}
+#notes header:hover {
+    background: #7a5d3d;
+    cursor: pointer;
+    font-size: 1.1rem;
+    color: #fcf8f1;
+    padding-top: 0.45rem;
+}
+#notes header:active {
+    background: #473624;
+    font-size: 1rem;
+    cursor:grabbing;
+    color: #948469;
+    padding-top: 0.45rem;
 }
 
 #notes main {
@@ -27,6 +46,9 @@
     flex-direction: column;
     gap: 0.5rem;
     padding: 0.75rem;
+}
+#notes main.hidden {
+    display: none !important;
 }
 .last{
     flex: 1;
@@ -49,6 +71,11 @@
 
 #notes button:hover {
     background: #dbc09a;
+}
+
+#notes button:active {
+    background: #a88c6a;
+    cursor: grabbing;
 }
 
 #noteInput {
@@ -143,6 +170,13 @@ nav {
     background: #c7ad8a;
     border: none;
     outline: none;
+}
+#notes details summary:hover {
+    color: #685442;
+}
+#notes details summary:active {
+    color: #332416;
+    cursor: grabbing;
 }
 #noteBrowserInput {
     width: 100%;
