@@ -180,7 +180,6 @@ class MapMaker extends App{
 	 */
 	async loadImages(savedImages = {}) {
 		const files = {
-			delete: "assets/delete.png",
 			addTile: "assets/add.png",
 			floor: "assets/floor.png",
 			wall: "assets/wall.png",
@@ -306,6 +305,12 @@ class MapMaker extends App{
 	 * @param {number} y
 	 */
 	updateInputContext(x, y) {
+		// if on mobile & we are in a text input, set input context to ui
+		if (document.activeElement && document.activeElement.tagName === "INPUT") {
+			this.inputContext = "ui";
+			return;
+		}
+
 		const element = document.elementFromPoint(x, y);
 
 		if (element === this.canvas || element?.closest("#mapCanvas") === this.canvas) {
@@ -370,6 +375,11 @@ class MapMaker extends App{
 
 		window.addEventListener("focus", () => {
 			this.restoreInputContext();
+		});
+		window.addEventListener("pointerdown", (event) => {
+			if (document.activeElement && document.activeElement.tagName === "INPUT") {
+				document.activeElement.blur();
+			}
 		});
 	}
 	loadButtons(){

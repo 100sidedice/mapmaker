@@ -96,7 +96,7 @@ export default class PixelEngine {
                 }
                 // if the selected tile is in a group, and this is not that group, darken
                 const lastKey = `${this.config.lastPickedRegion?.regionX}_${this.config.lastPickedRegion?.regionY}`;
-                if (this.config.lastPickedRegion && this.mapMaker.map[lastKey]?.["groups"] && Object.keys(this.mapMaker.map[lastKey]["groups"]).length > 0 && this.config.selectedRegionType!== "delete") {
+                if (this.config.lastPickedRegion && this.mapMaker.map[lastKey]?.["groups"] && Object.keys(this.mapMaker.map[lastKey]["groups"]).length > 0.) {
                     if (!this.mapMaker.map[key]?.["groups"] || !Object.keys(this.mapMaker.map[key]["groups"]).some(group => this.mapMaker.map[lastKey]["groups"][group])) {
                         if (this.mapMaker.map[key]?.["groups"] && Object.keys(this.mapMaker.map[key]["groups"]).length >= 1) {
                             // draw random tiles group colors evenly
@@ -240,10 +240,6 @@ export default class PixelEngine {
 
                 ctx.fillStyle = (this.config.erase || this.mouse.get("right")) ? "#ffffff" : this.config.selectedColor;
                 ctx.fillRect(minX, minY, maxX - minX + 1, maxY - minY + 1);
-                // if editing 'delete', right click should delete
-                if (this.config.selectedTileType === "delete" && (this.config.erase || this.mouse.get("right"))) {
-                    ctx.clearRect(minX, minY, maxX - minX + 1, maxY - minY + 1);
-                }
             }
         }
 
@@ -539,41 +535,6 @@ export default class PixelEngine {
                         this.mapMaker.save();
                         return;
                     }
-                },
-                type: "tap"
-            },
-            "Backspace": {
-                action: () => {
-                    const tileType = this.config.selectedTileType;
-                    if (!tileType || !this.mapMaker.images[tileType] || tileType === "delete" || tileType === "addTile") {
-                        return;
-                    }
-
-                    delete this.mapMaker.images[tileType];
-
-                    for (const key in this.mapMaker.map) {
-                        const region = this.mapMaker.map[key];
-                        let changed = false;
-
-                        for (let row = 0; row < 8; row++) {
-                            for (let col = 0; col < 8; col++) {
-                                const tile = region.tiles[row][col];
-
-                                if (tile !== "" && tile[0] === tileType) {
-                                    if (!changed) {
-                                        this.queueRegion(key, region.tiles);
-                                        changed = true;
-                                    }
-
-                                    region.tiles[row][col] = "";
-                                }
-                            }
-                        }
-                    }
-
-                    this.config.selectedTileType = "delete";
-                    this.updateRegions();
-                    this.updateToolbar();
                 },
                 type: "tap"
             },

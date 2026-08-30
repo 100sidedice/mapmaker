@@ -106,7 +106,7 @@ export default class SpaceEngine {
                 if (this.config.lastPickedGroup && (!groups || !groups.includes(this.config.lastPickedGroup))) {
                     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
                     this.ctx.fillRect(regionX * 8 * 32, regionY * 8 * 32, 8 * 32, 8 * 32);
-                }else if(!this.config.lastPickedGroup && this.config.selectedRegionType!== "delete"){
+                }else if(!this.config.lastPickedGroup){
                     // if the selected tile is in a group, and this is not that group, darken
                     const lastKey = `${this.config.lastPickedRegion?.regionX}_${this.config.lastPickedRegion?.regionY}`;
                     if (this.config.lastPickedRegion && this.mapMaker.map[lastKey]?.["groups"] && Object.keys(this.mapMaker.map[lastKey]["groups"]).length > 0) {
@@ -229,7 +229,7 @@ brush(pos, method="click", startRegionX=null, startRegionY=null, endRegionX=null
                         }
                         continue;
                     }
-                    if (this.config.selectedRegionType === "delete" || this.mouse.get("right")){
+                    if (this.mouse.get("right")){
                         // remove the region from the group
                         if (this.mapMaker.map[key]["groups"] && this.mapMaker.map[key]["groups"][this.config.lastPickedGroup]){
                             delete this.mapMaker.map[key]["groups"][this.config.lastPickedGroup];
@@ -247,7 +247,7 @@ brush(pos, method="click", startRegionX=null, startRegionY=null, endRegionX=null
                 const wasGrouped = this.mapMaker.map[key]?.["groups"] ? this.mapMaker.map[key]["groups"] : {};
                 if (this.config.alt) {
                     if (this.mapMaker.map[key]) {
-                        if (this.config.selectedRegionType === "delete" || this.mouse.get("right")) {
+                        if (this.mouse.get("right")) {
                             this.mapMaker.map[key] = {
                                 "tiles": this.mapMaker.map[key]["tiles"],
                                 "selected": false,
@@ -265,7 +265,7 @@ brush(pos, method="click", startRegionX=null, startRegionY=null, endRegionX=null
                 } else {
                     const oldRegion = this.mapMaker.map[key];
 
-                    if (this.config.selectedRegionType === "delete" || this.mouse.get("right")) {
+                    if (this.mouse.get("right") || this.config.erase) {
                         if (oldRegion) {
                             this.queueRegion(key, oldRegion.tiles);
                             delete this.mapMaker.map[key];
@@ -433,7 +433,7 @@ brush(pos, method="click", startRegionX=null, startRegionY=null, endRegionX=null
                     const regionY = Math.floor(worldPos.y / 256);
                     const key = `${regionX}_${regionY}`;
                     if (!this.mapMaker.map[key]){
-                        this.config.selectedRegionType = "delete";
+                        this.config.selectedRegionType = "floor";
                         return;
                     }
                     const hash = hashTiles(this.mapMaker.map[key]["tiles"])
@@ -447,10 +447,10 @@ brush(pos, method="click", startRegionX=null, startRegionY=null, endRegionX=null
                     }
                     
                     if (this.config.selectedRegionType === "") {
-                        this.config.selectedRegionType = "delete";
+                        this.config.selectedRegionType = "floor";
                     }
                     if (!this.config.selectedRegionType) {
-                        this.config.selectedRegionType = "delete";
+                        this.config.selectedRegionType = "floor";
                     }
                     this.selectNoteRegion();
                     this.config.lastPickedRegion = { regionX, regionY };
