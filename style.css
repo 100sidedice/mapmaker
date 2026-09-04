@@ -29,7 +29,7 @@ canvas#mapCanvas {
 body {
     margin: 0;
     display: grid;
-    grid-template-columns: 3fr 2fr 8fr 27rem;
+    grid-template-columns: 4fr 1fr 8fr 27rem;
     grid-template-rows: 1fr 8fr 0.5fr;
     grid-template-areas: 
     "sidebar sidebar toolbar notes"

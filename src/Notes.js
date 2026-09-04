@@ -369,6 +369,9 @@ export default class Notes {
         noteText.innerHTML = this.expandNoteVariables(note.text);
         displayArea.appendChild(noteText);
 
+        this.parseValueTags(noteText);
+        this.parseLocalKeywordTags(noteText);
+        this.parseRandomTags(noteText);
         this.parseDiceExpressions(noteText);
 
         // I will go back later and make it O((Keywords+Globals)*1) instead of O((Keywords*Globals(global note text))*Note text) but for now this is fine.
@@ -380,12 +383,13 @@ export default class Notes {
         }
 
         for (const key in this.mapMaker.notes) {
-            if (!key.startsWith("global_")) continue;
+            if (!key.startsWith("global_") && !key.startsWith("character_")) continue;
 
             const globalNote = this.mapMaker.notes[key];
             if (!globalNote) continue;
 
-            const title = key.replace("global_", "");
+            const title = key.replace(/^(global_|character_)/, "");
+            if (title === key) continue;
             if (!title) continue;
 
             this.linkNoteText(noteText, title, span => {
@@ -429,6 +433,89 @@ export default class Notes {
             style.classList.add("note-style");
             document.head.appendChild(style);
         }
+    }
+
+    /**
+     * Converts local value tags into text with a note-local tooltip.
+     *
+     * @param {HTMLElement} container
+     */
+    parseValueTags(container) {
+        container.querySelectorAll("value").forEach(valueTag => {
+            const separator = valueTag.textContent.indexOf(":");
+            if (separator === -1) return;
+
+            const name = valueTag.textContent.slice(0, separator).trim();
+            const value = valueTag.textContent.slice(separator + 1).trim();
+            if (!name || !value) return;
+
+            const valueSpan = document.createElement("span");
+            valueSpan.textContent = name;
+            addTooltip(valueSpan, value);
+            valueTag.replaceWith(valueSpan);
+        });
+    }
+
+    /**
+     * Converts local keyword declarations and links their other occurrences.
+     *
+     * @param {HTMLElement} container
+     */
+    parseLocalKeywordTags(container) {
+        const localKeywords = [];
+
+        container.querySelectorAll("keyword").forEach(keywordTag => {
+            const separator = keywordTag.textContent.indexOf(":");
+            if (separator === -1) return;
+
+            const name = keywordTag.textContent.slice(0, separator).trim();
+            const tooltip = keywordTag.textContent.slice(separator + 1).trim();
+            if (!name || !tooltip) return;
+
+            localKeywords.push({ name, tooltip });
+
+            const keywordSpan = document.createElement("span");
+            keywordSpan.textContent = name;
+            addTooltip(keywordSpan, tooltip);
+            keywordTag.replaceWith(keywordSpan);
+        });
+
+        for (const { name, tooltip } of localKeywords) {
+            this.linkNoteText(container, name, span => {
+                addTooltip(span, tooltip);
+            });
+        }
+    }
+
+    /**
+     * Converts random tags into clickable values.
+     * The first value is the initial display; the remaining values are choices.
+     *
+     * @param {HTMLElement} container
+     */
+    parseRandomTags(container) {
+        container.querySelectorAll("random").forEach(randomTag => {
+            const values = randomTag.textContent
+                .split(",")
+                .map(value => value.trim())
+                .filter(Boolean);
+
+            if (values.length < 2) return;
+
+            const defaultValue = values[0];
+            const options = values.slice(1);
+            const randomSpan = document.createElement("span");
+            randomSpan.textContent = defaultValue;
+            randomSpan.style.cursor = "pointer";
+            addTooltip(randomSpan, `Options: ${options.join(", ")}`);
+            randomSpan.addEventListener("click", event => {
+                event.stopPropagation();
+                const option = options[Math.floor(Math.random() * options.length)];
+                randomSpan.textContent = option;
+            });
+
+            randomTag.replaceWith(randomSpan);
+        });
     }
 
     /**

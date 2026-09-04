@@ -13,7 +13,10 @@ const TAGS = [
     { name: "ul" }, { name: "ol" }, { name: "li", after: /<(?:ul|ol)(?:\s[^>]*)?>\s*$/i },
     { name: "blockquote" }, { name: "pre" }, { name: "code" },
     { name: "fieldset" }, { name: "legend", after: /<fieldset(?:\s[^>]*)?>\s*$/i },
-    { name: "details" }, { name: "summary", after: /<details(?:\s[^>]*)?>\s*$/i }
+    { name: "details" }, { name: "summary", after: /<details(?:\s[^>]*)?>\s*$/i },
+    { name: "random", template: "<random>default, a,b,c</random>", cursor: 8 },
+    { name: "value", template: "<value>name:value</value>", cursor: 11 },
+    { name: "keyword", template: "<keyword>name:tooltip</keyword>", cursor: 13 }
 ];
 
 /**
@@ -96,6 +99,14 @@ export function attachNoteTagButtons(textarea, container) {
 function insertTag(textarea, tag) {
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
+    if (tag.template) {
+        textarea.setRangeText(tag.template, start, end, "end");
+        const cursor = tag.cursor ?? tag.template.length;
+        textarea.setSelectionRange(start + cursor, start + cursor);
+        textarea.dispatchEvent(new Event("input", { bubbles: true }));
+        return;
+    }
+
     const opening = `<${tag.name}>`;
     const insertion = tag.void ? opening : `${opening}</${tag.name}>`;
     const cursor = tag.void ? opening.length : opening.length;

@@ -249,6 +249,44 @@
                     <li>Fixed via properly giving the canvas a Tab index, and using the browsers focus system instead of the mouse-over event.</li>
                 </ul>
             </details>
+            <details>
+                <summary>Update 2 - Cross-platform</summary>
+                <p>You can now use this map maker on tablets, phones, and laptops!</p>
+                <h3>Cross-platform support</h3>
+                <ul>
+                    <li>Added touch input, and portrait-mode UI for phones.</li>
+                    <li>Added trackpad support - use ctrl + scroll to zoom, 2 fingers pan.</li>
+                </ul>
+                <h3>New HTML elements!</h3>
+                <ul>
+                    <li>&lt;keyword&gt;keyword content:value&lt;/keyword&gt; - add a local keyword.</li>
+                    <li>&lt;value&gt;value name:value&lt;/value&gt; - Similar to keyword, but only the 1 word.</li>
+                    <li>&lt;random&gt;name,a,b,c&lt;/random&gt; - randomly select one of the values.</li>
+                </ul>
+                <h3>The dice system!</h3>
+                <ul>
+                    <li>Typing something like [5d6] will turn it into a clickable dice roller.</li>
+                    <li>You can add settings in (parenthisis) to modify it.</li>
+                    <li>Examples</li>
+                    <li>[d6]</li>
+                    <li>[10d6]</li>
+                    <li>[10d6 (*2)] Multiplies</li>
+                    <li>[10d6 (+5)] Adds</li>
+                    <li>[10d6 (adv)] Advantage to full roll</li>
+                    <li>[10d6 (adv-all)] Advantage to each die</li>
+                    <li>[10d6 (dis)] Disadvantage to roll</li>
+                    <li>[10d6 (dis-all)] Disadvantage to each die</li>
+                    <li>Hover over a result to see details of it.</li>
+                </ul>
+                <h3>Bug fixes/UX imporvements</h3>
+                <ul>
+                    <li>Minor control-related adjustments</li>
+                    <li>Added a proper toolbar, so you don't need to use hotkeys for everything</li>
+                    <li>Improved note text area: alt to move lines, ctrl+alt to duplicate lines, tab adds 4 spaces</li>
+                    <li>Added a list of some html tags at the top beneath the color buttons</li>
+                    <li>Note that all html tags work - it's just a subset.</li>
+                </ul>
+            </details>
         </aside>
         <button id="close-instructions">Close Information</button>
         <aside id="notes" class="">
@@ -318,7 +356,7 @@
             <button id="confirm-yes">Yes</button>
             <button id="confirm-no">No</button>
         </menu>
-            <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
         <script type="module" src="script.js"></script>
     </body>
 </html>
