@@ -265,6 +265,13 @@ class MapMaker extends App{
 		});
 
 		this.mouse.hook("wheel-update", "camera-zoom-update", () => {
+			// Trackpad scrolling pans unless control is held, in which case it zooms.
+			if (this.mouse.trackpadMode && !this.config.ctrl) {
+				this.camera.x += this.mouse.wheelX / this.dpi / this.camera.zoom * 0.04;
+				this.camera.y += this.mouse.wheel / this.dpi / this.camera.zoom * 0.04;
+				return;
+			}
+
 			const wheelPos = this.mouse.extraData.wheelPos;
 			if (!wheelPos) return;
 			const worldBefore = this.screenToWorld(wheelPos.x, wheelPos.y);

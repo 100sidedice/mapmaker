@@ -486,12 +486,20 @@ export default class PixelEngine {
             // eyedropper
             "Control": {
                 action: () => {
+                    if (this.config.ctrl) return;
                     this.config.ctrl = true;
-                    this.pickColor();
-                    this.mapMaker.colorSliderEvent(this.config.selectedColor, false, true);
+                    this.mouse.trackpadScrollDistance = 0;
+                    if (!this.mouse.trackpadMode) {
+                        this.pickColor();
+                        this.mapMaker.colorSliderEvent(this.config.selectedColor, false, true);
+                    }
                 },
                 "release-action": () => {
                     this.config.ctrl = false;
+                    if (this.mouse.trackpadMode && this.mouse.trackpadScrollDistance < 30) {
+                        this.pickColor();
+                        this.mapMaker.colorSliderEvent(this.config.selectedColor, false, true);
+                    }
                 },
                 type: "hold"
             },

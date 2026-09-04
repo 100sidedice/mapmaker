@@ -561,7 +561,18 @@ export default class TileEngine {
             // eyedropper
             "Control": {
                 action: () => {
-                    this.config.ctrl = true; 
+                    if (this.config.ctrl) return;
+                    this.config.ctrl = true;
+                    this.mouse.trackpadScrollDistance = 0;
+                    if (!this.mouse.trackpadMode) {
+                        this.config.ctrl = false;
+                        this.keyMap["Control"]["release-action"]();
+                        this.config.ctrl = true;
+                    }
+                },
+                "release-action": () => {
+                    this.config.ctrl = false;
+                    if (this.mouse.trackpadMode && this.mouse.trackpadScrollDistance >= 30) return;
                     const worldPos = this.mapMaker.screenToWorld(this.mouse.x, this.mouse.y);
                     
                     if (this.config.annotate) {
@@ -604,20 +615,18 @@ export default class TileEngine {
                     const regionY = Math.floor(tileY / 8);
                     const key = `${regionX}_${regionY}`;
 
-                    if (this.mapMaker.map[key]) {
-                        this.config.selectedTileType = this.mapMaker.map[key]["tiles"][tileY % 8][tileX % 8][0];
+                    if (!this.mapMaker.map[key]) {
+                        return;
                     }
 
-                    if (this.config.selectedTileType === "") {
+                    const tile = this.mapMaker.map[key]["tiles"][tileY % 8][tileX % 8];
+                    if (!Array.isArray(tile) || !tile[0]) {
                         return;
                     }
-                    if (!this.config.selectedTileType) {
-                        return;
-                    }
+                    this.config.selectedTileType = tile[0];
                     this.selectNoteTile();
                     this.config.lastPicked = { regionX, regionY, tileX: tileX % 8, tileY: tileY % 8 };
                 },
-                "release-action": () => { this.config.ctrl = false; },
                 type: "hold"
             },
             // copy

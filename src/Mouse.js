@@ -1,3 +1,15 @@
+export function detectTrackpad(event) {
+    if (event.deltaMode !== 0) {
+        return false;
+    }
+
+    if (event.deltaX !== 0) {
+        return true;
+    }
+
+    return Math.abs(event.deltaY) < 50;
+}
+
 export default class Mouse {
     constructor(element) {
         this.element = element;
@@ -20,6 +32,9 @@ export default class Mouse {
         };
 
         this.wheel = 0;
+        this.wheelX = 0;
+        this.trackpadMode = false;
+        this.trackpadScrollDistance = 0;
         this.delta = [0, 0];
         this.inside = false;
         this.hooks = {};
@@ -92,8 +107,17 @@ export default class Mouse {
 
         this.element.addEventListener('wheel', (e) => {
             e.preventDefault();
-            this.wheel += e.deltaY;
-            this.runHook('wheel', this.getPos(), e.deltaY);
+            if (!this.trackpadMode && detectTrackpad(e)) {
+                this.trackpadMode = true;
+            }
+            if (this.trackpadMode){
+                this.wheelX += e.deltaX;
+                this.wheel += e.deltaY;
+                this.trackpadScrollDistance += Math.abs(e.deltaX) + Math.abs(e.deltaY);
+            } else {
+                this.wheel += e.deltaY;
+            }
+            this.runHook('wheel', this.getPos(), e.deltaY, e);
         });
 
         this.element.addEventListener('contextmenu', (e) => {
@@ -493,13 +517,15 @@ export default class Mouse {
     }
 
     update() {
-        if (this.wheel < 0.01 && this.wheel > -0.01) {
-            this.wheel = 0;
-        } else {
-            this.runHook('wheel-update');
-        }
+        this.runHook('wheel-update');
 
-        this.wheel *= 0.8;
+        if (!this.trackpadMode) {
+            this.wheel *= 0.8;
+            this.wheelX *= 0.8;
+        }else{
+            this.wheel *= 0.8;
+            this.wheelX *= 0.8;
+        }
 
         for (const button in this.buttons) {
             if (this.get(button)) {

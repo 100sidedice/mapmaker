@@ -480,7 +480,18 @@ export default class RegionEngine {
             },
             "Control": {
                 action: () => {
-                    this.config.ctrl = true; 
+                    if (this.config.ctrl) return;
+                    this.config.ctrl = true;
+                    this.mouse.trackpadScrollDistance = 0;
+                    if (!this.mouse.trackpadMode) {
+                        this.config.ctrl = false;
+                        this.keyMap["Control"]["release-action"]();
+                        this.config.ctrl = true;
+                    }
+                },
+                "release-action": () => {
+                    this.config.ctrl = false;
+                    if (this.mouse.trackpadMode && this.mouse.trackpadScrollDistance >= 30) return;
                     this.config.lastPickedGroup = ""
                     const worldPos = this.mapMaker.screenToWorld(this.mouse.x, this.mouse.y);
                     const regionX = Math.floor(worldPos.x / 256);
@@ -522,7 +533,6 @@ export default class RegionEngine {
                     // go to note
                     this.mapMaker.Notes.goto(`group_${groupKey}`);
                 },
-                "release-action": () => { this.config.ctrl = false; },
                 type: "hold"
             },
             "c": {
