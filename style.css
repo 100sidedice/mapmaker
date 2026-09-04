@@ -35,14 +35,14 @@ body {
     "sidebar sidebar toolbar notes"
     "instructions content content notes"
     "buttons buttons buttons notes";
-    height: 100dvh;
+    height: var(--viewport-height, 100dvh);
     width: 100%;
     padding: 0;
     position: fixed;
     overscroll-behavior: none;
 }
 html {
-    height: 100%;
+    height: var(--viewport-height, 100%);
     overscroll-behavior: none;
     position: fixed;
 }
@@ -231,4 +231,145 @@ ul {
 }
 span {
     user-select: none;
+}
+
+@media (max-width: 600px) {
+    body {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 3.5rem 1fr 4.5rem;
+        grid-template-areas:
+            "notes info"
+            "content content"
+            "toolbar toolbar";
+    }
+
+    #buttonContainer,
+    #tileContainer {
+        display: none;
+    }
+
+    #notes {
+        grid-area: notes;
+        position: relative;
+        width: 100%;
+        height: 3.5rem !important;
+        margin: 0;
+        border: none;
+        overflow: visible;
+    }
+
+    #notes main {
+        display: none;
+    }
+
+    #notes main:not(.hidden) {
+        display: flex;
+    }
+
+    #notes:has(main:not(.hidden)) {
+        z-index: 4;
+    }
+
+    #notes main:not(.hidden) {
+        position: fixed;
+        top: 3.5rem;
+        right: 0;
+        left: 0;
+        height: calc(var(--viewport-height, 100dvh) - 8rem);
+        box-sizing: border-box;
+        display: flex;
+        min-height: 0;
+        margin: 0;
+        overflow: auto;
+        background: #99866e;
+        z-index: 4;
+    }
+
+    #notes header {
+        box-sizing: border-box;
+        width: 100%;
+        height: 3.5rem;
+        margin: 0;
+        padding: 0.5rem 1rem;
+        border: none;
+        background: #664c2e;
+        color: #f5ead7;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #notes header:hover,
+    #notes header:active {
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+        background: #7a5d3d;
+        color: #fcf8f1;
+    }
+
+    #instructions {
+        position: fixed;
+        top: 3.5rem;
+        right: 0;
+        bottom: 4.5rem;
+        left: 0;
+        width: 100%;
+        height: auto;
+        box-sizing: border-box;
+        margin: 0;
+        overflow-y: auto;
+        z-index: 4;
+    }
+
+    #close-instructions {
+        grid-area: info;
+        position: relative;
+        width: 100%;
+        height: 3.5rem;
+        margin: 0;
+        justify-self: end;
+        z-index: 5;
+    }
+
+    #toolbar {
+        grid-area: toolbar;
+        box-sizing: border-box;
+        min-width: 0;
+        min-height: 0;
+        margin: 0;
+        padding: 0.35rem;
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+    }
+
+    #toolbar legend {
+        display: none;
+    }
+
+    #toolbar button {
+        flex: 0 0 auto;
+        min-width: 5rem;
+        height: 3.5rem;
+    }
+
+    html.keyboard-open body {
+        grid-template-rows: 0 1fr 0;
+    }
+
+    html.keyboard-open #notes {
+        height: 0 !important;
+    }
+
+    html.keyboard-open #notes header,
+    html.keyboard-open #close-instructions,
+    html.keyboard-open #toolbar {
+        display: none;
+    }
+
+    html.keyboard-open #notes main:not(.hidden) {
+        top: 0;
+        height: var(--viewport-height, 100dvh);
+    }
 }

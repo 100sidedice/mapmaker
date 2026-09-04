@@ -21,6 +21,11 @@ export default class Notes {
         notesHeader.addEventListener("click", () => {
             console.log("Notes header clicked");
             const mainNoteArea = document.getElementById("notesMain");
+            const instructions = document.getElementById("instructions");
+            if (mainNoteArea.classList.contains("hidden")) {
+                instructions.classList.add("hide");
+                document.getElementById("close-instructions").textContent = "Open Information";
+            }
             mainNoteArea.classList.toggle("hidden");
             // shrink notes area to just header size
             const notes = document.getElementById("notes");
@@ -30,6 +35,10 @@ export default class Notes {
                 notes.style.height = "auto";
             }
         });
+
+        if (window.matchMedia("(max-width: 600px)").matches) {
+            document.getElementById("notesMain").classList.add("hidden");
+        }
     }
     saveCurrentNote() {
         if (!this.mapMaker.currentNoteKey) return;
@@ -69,6 +78,10 @@ export default class Notes {
         const noteInput = document.getElementById("noteInput");
         noteInput.addEventListener("input", () => {
             this.saveCurrentNote();
+        });
+
+        document.getElementById("close-note-keyboard").addEventListener("click", () => {
+            document.activeElement?.blur();
         });
 
         // removeNoteButton: button to remove the current note
@@ -115,7 +128,7 @@ export default class Notes {
         editNotes.addEventListener("click", () => {
             // update menu
             showElms(document.querySelector("#notes > main"), "section.area", "noteEdit");
-            showElms(document.querySelector("#notes > main #mainNoteControls"), "button", "note-edit-back", "note-remove");
+                showElms(document.querySelector("#notes > main #mainNoteControls"), "button", "note-edit-back", "note-remove", "close-note-keyboard");
 
             // if a note exists, highlight the color button for that note if able to
             if (this.mapMaker.currentNoteKey && this.mapMaker.notes[this.mapMaker.currentNoteKey]) {
@@ -184,6 +197,12 @@ export default class Notes {
             noteBrowserInput.classList.add("hide");
             searchNotes.classList.remove("hide");
             clearTooltip();
+        });
+        noteBrowserInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                noteBrowserInput.blur();
+            }
         });
         noteBrowserInput.addEventListener("input", async () => {
             const query = noteBrowserInput.value.trim();

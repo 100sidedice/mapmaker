@@ -32,6 +32,25 @@ class MapMaker extends App{
 			"height": this.canvas.height / this.dpi
 		}
 		this.visualViewport = window.visualViewport || { width: window.innerWidth, height: window.innerHeight };
+		let textInputFocused = false;
+		const updateViewportHeight = () => {
+			document.documentElement.style.setProperty("--viewport-height", `${this.visualViewport.height}px`);
+			document.documentElement.classList.toggle("keyboard-open", textInputFocused);
+		};
+		updateViewportHeight();
+		if (window.visualViewport) {
+			window.visualViewport.addEventListener("resize", updateViewportHeight);
+		}
+		document.addEventListener("focusin", (event) => {
+			textInputFocused = event.target.matches("input, textarea");
+			updateViewportHeight();
+		});
+		document.addEventListener("focusout", (event) => {
+			if (event.target.matches("input, textarea")) {
+				textInputFocused = false;
+				updateViewportHeight();
+			}
+		});
 
 		// map  "x_y" = 8x8 region of the map, row:[col:[tile type, selected || ""]] 
 		this.map = {
@@ -555,6 +574,10 @@ class MapMaker extends App{
 			// if instructions are open, close them, change the button text to "Open Instructions"
 			// toggle 'hide' class
 			const instructions = document.getElementById("instructions");
+			if (instructions.classList.contains("hide")) {
+				document.getElementById("notesMain").classList.add("hidden");
+				document.getElementById("notes").style.height = "3rem";
+			}
 			instructions.classList.toggle("hide");
 			if (instructions.classList.contains("hide")) {
 				closeInstructionsButton.textContent = "Open Information";
@@ -562,6 +585,10 @@ class MapMaker extends App{
 				closeInstructionsButton.textContent = "Close Information";
 			}
 		});
+		if (window.matchMedia("(max-width: 600px)").matches) {
+			document.getElementById("instructions").classList.add("hide");
+			closeInstructionsButton.textContent = "Open Information";
+		}
 	}
 	draw(){
 		this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform

@@ -17,8 +17,10 @@ class TooltipManager {
 	 */
 	addTooltip(element, text) {
 		this.removeTooltip(element);
+		const isTouchDevice = () => window.matchMedia("(pointer: coarse)").matches;
 
 		const mouseEnter = () => {
+			if (isTouchDevice()) return;
 			this.show(element, text);
 		};
 
@@ -26,10 +28,26 @@ class TooltipManager {
 			this.hide(element);
 		};
 
+		const touchStart = () => {
+			this.clearTimeout();
+			this.hide(element);
+			this.timeout = setTimeout(() => {
+				this.show(element, text, 0);
+			}, 1000);
+		};
+
+		const touchEnd = () => {
+			this.clearTimeout();
+			this.hide(element);
+		};
+
 		element.addEventListener("mouseenter", mouseEnter);
 		element.addEventListener("mouseleave", mouseLeave);
+		element.addEventListener("touchstart", touchStart, { passive: true });
+		element.addEventListener("touchend", touchEnd);
+		element.addEventListener("touchcancel", touchEnd);
 
-		this.targets.set(element, { mouseEnter, mouseLeave });
+		this.targets.set(element, { mouseEnter, mouseLeave, touchStart, touchEnd });
 	}
 
 	/**
@@ -45,6 +63,9 @@ class TooltipManager {
 
 		element.removeEventListener("mouseenter", handlers.mouseEnter);
 		element.removeEventListener("mouseleave", handlers.mouseLeave);
+		element.removeEventListener("touchstart", handlers.touchStart);
+		element.removeEventListener("touchend", handlers.touchEnd);
+		element.removeEventListener("touchcancel", handlers.touchEnd);
 
 		this.targets.delete(element);
 
@@ -58,7 +79,7 @@ class TooltipManager {
 	 * @param {HTMLElement} element - Element being hovered.
 	 * @param {string} text - Tooltip text.
 	 */
-	show(element, text) {
+	show(element, text, delay = 500) {
 		this.clearTimeout();
 
 		// if element does not exist, do not show tooltip
@@ -97,7 +118,7 @@ class TooltipManager {
 			this.tooltip.textContent = text;
 			this.tooltip.classList.add("visible");
 			this.position(element);
-		}, 500);
+		}, delay);
 	}
 
 	/**
