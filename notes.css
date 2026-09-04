@@ -267,6 +267,26 @@ nav {
 	width: 100%;
 }
 
+.color-slider-input {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    margin-top: 0.35rem;
+    padding: 0.25rem 0.4rem;
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+    font: inherit;
+}
+
+.color-slider-input[hidden] {
+    display: none;
+}
+
+.color-slider-input.invalid {
+    border-color: #d00;
+    color: #d00;
+}
+
 .color-slider {
 	display: block;
 	width: 100%;

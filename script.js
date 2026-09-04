@@ -574,9 +574,11 @@ class MapMaker extends App{
 			// if instructions are open, close them, change the button text to "Open Instructions"
 			// toggle 'hide' class
 			const instructions = document.getElementById("instructions");
-			if (instructions.classList.contains("hide")) {
-				document.getElementById("notesMain").classList.add("hidden");
-				document.getElementById("notes").style.height = "3rem";
+			if (!document.getElementById("tileContainer").checkVisibility()) {
+				if (instructions.classList.contains("hide")) {
+					document.getElementById("notesMain").classList.add("hidden");
+					document.getElementById("notes").style.height = "3rem";
+				}
 			}
 			instructions.classList.toggle("hide");
 			if (instructions.classList.contains("hide")) {

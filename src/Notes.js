@@ -21,10 +21,12 @@ export default class Notes {
         notesHeader.addEventListener("click", () => {
             console.log("Notes header clicked");
             const mainNoteArea = document.getElementById("notesMain");
-            const instructions = document.getElementById("instructions");
-            if (mainNoteArea.classList.contains("hidden")) {
-                instructions.classList.add("hide");
-                document.getElementById("close-instructions").textContent = "Open Information";
+            if (!document.getElementById("tileContainer").checkVisibility()) {
+                const instructions = document.getElementById("instructions");
+                if (mainNoteArea.classList.contains("hidden")) {
+                    instructions.classList.add("hide");
+                    document.getElementById("close-instructions").textContent = "Open Information";
+                }
             }
             mainNoteArea.classList.toggle("hidden");
             // shrink notes area to just header size
@@ -907,7 +909,7 @@ export default class Notes {
                     keyword.color = newColor;
                     text.style.color = newColor;
                     keywordButton.style.backgroundColor = newColor;
-                }, false, keyword.color);
+                }, false, keyword.color, undefined, undefined, false, true);
                 color.style.setProperty("grid-area", "color");
                 keywordFieldset.appendChild(color);
                 const tooltip = document.createElement("textarea");
@@ -1351,9 +1353,10 @@ function getOpenCatagories(){
  * @param {string} width - Optional CSS width.
  * @param {string} height - Optional CSS height.
  * @param {boolean} grayScale - Whether to use a linear white-to-black grayscale gradient.
+ * @param {boolean} hexInput - Whether to show the editable hex input.
  * @returns {[HTMLElement, (color?: string, alpha?: boolean, grayScale?: boolean) => void]} Slider wrapper and handle loader.
  */
-export function createColorSlider(container, onChange, alpha = false, initialColor = "#ff0000", width, height, grayScale = false) {
+export function createColorSlider(container, onChange, alpha = false, initialColor = "#ff0000", width, height, grayScale = false, hexInput = false) {
 	const wrapper = document.createElement("div");
 	wrapper.classList.add("color-slider-wrapper");
 
@@ -1378,7 +1381,34 @@ export function createColorSlider(container, onChange, alpha = false, initialCol
 	const handle = document.createElement("div");
 	handle.classList.add("color-slider-handle");
 
+    const colorInput = document.createElement("input");
+    colorInput.type = "text";
+    colorInput.classList.add("color-slider-input");
+    colorInput.inputMode = "text";
+    colorInput.maxLength = 9;
+    colorInput.spellcheck = false;
+    colorInput.setAttribute("aria-label", "Hex color");
+    colorInput.hidden = !hexInput;
+
 	const ctx = canvas.getContext("2d");
+    const hexColorPattern = /^#(?:[\da-f]{3}|[\da-f]{4}|[\da-f]{6}|[\da-f]{8})$/i;
+
+    function colorToHex(color) {
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = 1;
+        tempCanvas.height = 1;
+        const tempCtx = tempCanvas.getContext("2d");
+        tempCtx.fillStyle = color;
+        tempCtx.fillRect(0, 0, 1, 1);
+        const pixel = tempCtx.getImageData(0, 0, 1, 1).data;
+        const hex = [...pixel].map(value => value.toString(16).padStart(2, "0"));
+        return pixel[3] === 255 ? `#${hex.slice(0, 3).join("")}` : `#${hex.join("")}`;
+    }
+
+    function setColorInput(color) {
+        colorInput.value = colorToHex(color);
+        colorInput.classList.remove("invalid");
+    }
 
 	function drawGradient(currentAlpha = alpha, currentGrayScale = grayScale) {
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1490,6 +1520,7 @@ export function createColorSlider(container, onChange, alpha = false, initialCol
 		handle.style.left = `${position.displayX}px`;
 		handle.style.top = `${position.displayY}px`;
 		handle.style.background = color;
+        setColorInput(color);
 
 		onChange(color);
 	}
@@ -1519,8 +1550,34 @@ export function createColorSlider(container, onChange, alpha = false, initialCol
 		isDragging = false;
 	});
 
-	wrapper.append(canvas, handle);
+    colorInput.addEventListener("input", () => {
+        const color = colorInput.value.trim();
+        const normalizedColor = color.startsWith("#") ? color : `#${color}`;
+        const isValid = hexColorPattern.test(normalizedColor);
+        colorInput.classList.toggle("invalid", !isValid);
+        if (isValid) {
+            onChange(normalizedColor);
+            loadHandle(normalizedColor, alpha, grayScale, false);
+        }
+    });
+
+    colorInput.addEventListener("blur", () => {
+        const color = colorInput.value.trim();
+        const normalizedColor = color.startsWith("#") ? color : `#${color}`;
+        colorInput.value = normalizedColor;
+        colorInput.classList.toggle("invalid", !hexColorPattern.test(normalizedColor));
+    });
+
+    colorInput.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            colorInput.blur();
+        }
+    });
+
+    wrapper.append(canvas, handle, colorInput);
 	container.appendChild(wrapper);
+    setColorInput(initialColor);
 
 	/**
 	 * Gets the Y-axis curve for positioning the handle.
@@ -1558,7 +1615,10 @@ export function createColorSlider(container, onChange, alpha = false, initialCol
 	 * @param {boolean} currentAlpha - Whether alpha mode is enabled.
 	 * @param {boolean} currentGrayScale - Whether grayscale mode is enabled.
 	 */
-	function loadHandle(color = initialColor, currentAlpha = alpha, currentGrayScale = grayScale) {
+    function loadHandle(color = initialColor, currentAlpha = alpha, currentGrayScale = grayScale, updateInput = true) {
+        if (updateInput) {
+            setColorInput(color);
+        }
 		requestAnimationFrame(() => {
 			drawGradient(currentAlpha, currentGrayScale);
 

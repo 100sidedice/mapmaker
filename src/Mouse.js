@@ -7,7 +7,7 @@ export function detectTrackpad(event) {
         return true;
     }
 
-    return Math.abs(event.deltaY) < 50;
+    return Math.abs(event.deltaY) < 5;
 }
 
 export default class Mouse {
@@ -525,6 +525,9 @@ export default class Mouse {
         }else{
             this.wheel *= 0.8;
             this.wheelX *= 0.8;
+        }
+        if (this.get("middle")) {
+            this.trackpadMode = false;
         }
 
         for (const button in this.buttons) {
