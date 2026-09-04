@@ -233,6 +233,10 @@ span {
     user-select: none;
 }
 
+.mobile-only {
+    display: none;
+}
+
 @media (max-width: 600px) {
     body {
         grid-template-columns: 1fr 1fr;
@@ -352,6 +356,10 @@ span {
         flex: 0 0 auto;
         min-width: 5rem;
         height: 3.5rem;
+    }
+
+    #toolbar button.mobile-only {
+        display: block;
     }
 
     html.keyboard-open body {

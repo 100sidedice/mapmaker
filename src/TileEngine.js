@@ -531,7 +531,7 @@ export default class TileEngine {
             // cycle brush type right
             "e": {
                 action: () => {
-                    const keys = Object.keys(this.mapMaker.images);
+                    const keys = Object.keys(this.mapMaker.images).filter(key => key !== "addTile");
                     const currentIndex = keys.indexOf(this.config.selectedTileType);
                     const nextIndex = (currentIndex + 1) % keys.length;
                     this.config.selectedTileType = keys[nextIndex];
@@ -541,7 +541,7 @@ export default class TileEngine {
             // cycle brush type left
             "q": {
                 action: () => {
-                    const keys = Object.keys(this.mapMaker.images);
+                    const keys = Object.keys(this.mapMaker.images).filter(key => key !== "addTile");
                     const currentIndex = keys.indexOf(this.config.selectedTileType);
                     const nextIndex = (currentIndex - 1 + keys.length) % keys.length;
                     this.config.selectedTileType = keys[nextIndex];

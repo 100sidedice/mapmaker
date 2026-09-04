@@ -618,6 +618,12 @@ class MapMaker extends App{
 	}
 	createToolbar(){
 		const toolbar = document.getElementById("toolbar");
+		const swapTileButton = document.getElementById("swap-tile");
+		swapTileButton.addEventListener("click", () => {
+			if (this.keyMap["e"]) {
+				this.keyMap["e"]["action"]();
+			}
+		});
 		const selectButton = document.getElementById("select");
 		selectButton.addEventListener("click", () => {
 			let action = "enable-selection";
