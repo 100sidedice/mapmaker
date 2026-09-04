@@ -1,6 +1,7 @@
 import { addTooltip, removeTooltip, clearTooltip } from "./Tooltip.js";
 import SearchEngine from "./SearchEngine.js";
 import DiceRoller from "./DiceRoller.js";
+import { attachNoteEditor, attachNoteTagButtons } from "./NoteEditor.js";
 
 export default class Notes {
     constructor(mapMaker){
@@ -78,6 +79,10 @@ export default class Notes {
 
         // noteInput: text area for note input/display
         const noteInput = document.getElementById("noteInput");
+        attachNoteEditor(noteInput);
+        const hr = document.createElement("hr");
+        noteInput.parentNode.appendChild(hr);
+        attachNoteTagButtons(noteInput, document.getElementById("note-tag-controls"));
         noteInput.addEventListener("input", () => {
             this.saveCurrentNote();
         });
@@ -704,6 +709,102 @@ export default class Notes {
             parent.appendChild(hr);
         }
         // global
+        function createCharacterNotesSection() {
+            const globalDetails = document.createElement("details");
+            if (openCatagories.includes("Character")) {
+                globalDetails.setAttribute("open", "");
+            }
+            globalDetails.id = "Character";
+            const globalSummary = document.createElement("summary");
+            globalSummary.textContent = "Character notes";
+            globalDetails.appendChild(globalSummary);
+            const globalhr = document.createElement("hr");
+            globalhr.style.margin = "0.5rem 0";
+            globalDetails.appendChild(globalhr);
+            const globalFieldset = document.createElement("fieldset");
+            globalFieldset.id = "note-browser-global-notes";
+            globalFieldset.classList.add("plain");
+            globalDetails.appendChild(globalFieldset);
+            // for each note with a key that starts with "character_", create a button in the globalFieldset
+            let count = 0;
+            for (const key in this.mapMaker.notes) {
+                if (key.startsWith("character_")) {
+                    count++;
+                    const note = this.mapMaker.notes[key];
+                    const button = document.createElement("button");
+                    button.classList.add("nav-note");
+                    button.textContent = key.replace("character_", "");
+                    // set the button's background color to the note's color
+                    if (note.color) {
+                        button.style.backgroundColor = note.color;
+                    } else {
+                        button.style.backgroundColor = "#cba778"; // default color
+                    }
+                    button.addEventListener("click", () => {
+                        this.goto(key);
+                    });
+                    globalFieldset.appendChild(button);
+                }
+            }
+            // add a text input for the note title, hidden by default
+            const noteTitleInput = document.createElement("textarea");
+            noteTitleInput.id = "note-browser-title-input";
+            noteTitleInput.placeholder = "Enter note title...";
+            noteTitleInput.classList.add("note-title", "hide");
+            noteTitleInput.addEventListener("blur", () => {
+                // if the input is empty, hide it and show the add button again
+                if (noteTitleInput.value.trim() === "") {
+                    noteTitleInput.classList.add("hide");
+                    const addCharacterButton = document.getElementById("note-browser-character-add");
+                    addCharacterButton.classList.remove("hide");
+                    return;
+                }
+                // create a new global note with the title as the key
+                const key = "character_" + noteTitleInput.value.trim();
+                this.mapMaker.notes[key] = {
+                    "color": "#ff000033", // default color
+                    "text": ""
+                };
+                this.goto(key);
+                // hide the input and show the add button again
+                noteTitleInput.classList.add("hide");
+                const addCharacterButton = document.getElementById("note-browser-character-add");
+                addCharacterButton.classList.remove("hide");
+                // clear the input
+                noteTitleInput.value = "";
+                // regenerate the categories to show the new note
+                this.generateCatagories();
+            });
+            // add an event listener for the enter key to blur the input
+            noteTitleInput.addEventListener("keydown", (event) => {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    noteTitleInput.blur();
+                }
+            });
+            globalDetails.appendChild(noteTitleInput);
+            if (count > 0) {
+                const bottomHr = document.createElement("hr");
+                bottomHr.style.margin = "0.5rem 0";
+                globalDetails.appendChild(bottomHr);
+            }
+            // add a button to add a new global note
+            const addGlobalButton = document.createElement("button");
+            addGlobalButton.id = "note-browser-global-add";
+            addGlobalButton.classList.add("nav-add");
+            addTooltip(addGlobalButton, "Add a global note");
+            addGlobalButton.textContent = "Add note";
+            addGlobalButton.addEventListener("click", () => {
+                // hide this button and show the note title input
+                addGlobalButton.classList.add("hide");
+                noteTitleInput.classList.remove("hide");
+                noteTitleInput.focus();
+            });
+            globalDetails.appendChild(addGlobalButton);
+
+            // append the globalDetails to the noteBrowser
+            noteBrowser.appendChild(globalDetails);
+        }
         function createGlobalNotesSection() {
             const globalDetails = document.createElement("details");
             if (openCatagories.includes("Global")) {
@@ -1280,6 +1381,8 @@ export default class Notes {
         }
 
         createGlobalNotesSection.call(this);
+        addHr(noteBrowser);
+        createCharacterNotesSection.call(this);
         addHr(noteBrowser);
         createKeywordsSection.call(this);
         // show tile notes if we have any, otherwise show region notes

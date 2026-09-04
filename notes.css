@@ -137,6 +137,18 @@ hr {
     background: #f3e6cf;
     cursor: pointer;
 }
+.note-tag {
+    flex: 0 0 auto !important;
+    min-width: 3.5rem;
+    white-space: nowrap;
+}
+#note-tag-controls {
+    max-height: 5.5rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    flex-wrap: wrap;
+    align-content: flex-start;
+}
 section.area {
     display: flex;
     flex-direction: column;
@@ -156,6 +168,42 @@ section.area {
     font-family: inherit;
     resize: vertical;
     line-height: 1.4;
+}
+
+#noteDisplay fieldset {
+    margin: 0.35rem 0;
+    padding: 0.4rem 0.5rem;
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: #332416;
+}
+
+#noteDisplay legend {
+    padding: 0 0.25rem;
+    color: #332416;
+    font-weight: bold;
+}
+
+#notes #noteDisplay details {
+    margin: 0.35rem 0;
+    padding: 0.25rem 0.4rem;
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+    outline: none;
+    background: transparent;
+    color: #332416;
+}
+
+#notes #noteDisplay details summary {
+    padding: 0.1rem 0.25rem;
+    background: transparent;
+    color: #332416;
+    cursor: pointer;
+}
+
+#notes #noteDisplay details summary:hover {
+    color: #685442;
 }
 
 /** Note browser */
