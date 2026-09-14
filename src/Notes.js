@@ -3,11 +3,57 @@ import SearchEngine from "./SearchEngine.js";
 import DiceRoller from "./DiceRoller.js";
 import { attachNoteEditor, attachNoteTagButtons } from "./NoteEditor.js";
 
+const NOTE_TEMPLATES = [
+    {
+        name: "temp-Character",
+        html: `<h2>Character</h2>
+<details open>
+    <summary>Core</summary>
+    <ul>
+        <li>Max HP:20<textarea id="comment"></textarea></li>
+        <li>AC:10</li>
+    </ul>
+</details>
+<details>
+    <summary>Stats</summary>
+    <ul>
+        <li><keyword>Str:5</keyword>:20</li>
+        <li><keyword>Dex:5</keyword>:20</li>
+        <li><keyword>Con:5</keyword>:20</li>
+        <li><keyword>Int:5</keyword>:20</li>
+        <li><keyword>Wis:5</keyword>:20</li>
+        <li><keyword>Chr:5</keyword>:20</li>
+    </ul>
+</details>
+<details>
+    <summary>Items</summary>
+    <ul>
+        <li><value>Rope:50ft</value></li>
+    </ul>
+</details>
+<details>
+    <summary>Simple actions</summary>
+    <li><textarea id="attack-1"></textarea></li>
+    <details>
+        <summary>Simple swing</summary>
+        <p>Does [1d6] slashing damage</p>
+    </details>
+</details>
+<details>
+    <summary>Plain infomation</summary>
+    <p>hello</p>
+</details>`
+    }
+];
+
 export default class Notes {
     constructor(mapMaker){
         this.mapMaker = mapMaker;
         this.searchEngine = new SearchEngine(this.mapMaker.notes);
         this.diceRoller = new DiceRoller();
+        this.mapMaker.notes.templates ??= [];
+        this.noteHistory = new Map();
+        this.historyApplying = false;
     }
 
     load(){
@@ -44,9 +90,18 @@ export default class Notes {
         }
     }
     saveCurrentNote() {
+        const input = document.getElementById("noteInput");
+
+        if (Number.isInteger(this.editingTemplateIndex)) {
+            const template = this.mapMaker.notes.templates?.[this.editingTemplateIndex];
+            if (template) {
+                template.html = input.value;
+            }
+            return;
+        }
+
         if (!this.mapMaker.currentNoteKey) return;
 
-        const input = document.getElementById("noteInput");
         const text = input.value.trim();
         const variableRegex = /<var\s+key=["']([^"']+)["']>([\s\S]*?)<\/var>/gi;
         let match;
@@ -74,6 +129,63 @@ export default class Notes {
             this.mapMaker.notes[this.mapMaker.currentNoteKey].text = text;
         }
     }
+    getNoteHistoryKey() {
+        if (Number.isInteger(this.editingTemplateIndex)) {
+            return `template:${this.editingTemplateIndex}`;
+        }
+
+        return this.mapMaker.currentNoteKey ? `note:${this.mapMaker.currentNoteKey}` : null;
+    }
+    resetNoteHistory(value) {
+        const key = this.getNoteHistoryKey();
+        if (!key) return;
+
+        this.noteHistory.set(key, {
+            undo: [value],
+            redo: []
+        });
+    }
+    recordNoteHistory(value) {
+        if (this.historyApplying) return;
+
+        const key = this.getNoteHistoryKey();
+        if (!key) return;
+
+        let history = this.noteHistory.get(key);
+        if (!history) {
+            this.resetNoteHistory(value);
+            return;
+        }
+
+        if (history.undo.at(-1) === value) return;
+
+        history.undo.push(value);
+        if (history.undo.length > 33) history.undo.shift();
+        history.redo = [];
+    }
+    changeNoteHistory(direction) {
+        const key = this.getNoteHistoryKey();
+        const history = key ? this.noteHistory.get(key) : null;
+        if (!history) return;
+
+        if (direction === "undo") {
+            if (history.undo.length < 2) return;
+
+            history.redo.push(history.undo.pop());
+        } else {
+            if (!history.redo.length) return;
+
+            history.undo.push(history.redo.pop());
+        }
+
+        const input = document.getElementById("noteInput");
+        this.historyApplying = true;
+        input.value = history.undo.at(-1);
+        this.saveCurrentNote();
+        this.historyApplying = false;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.focus();
+    }
     loadNoteButtons(){
         // Region and tile notes
 
@@ -84,7 +196,15 @@ export default class Notes {
         noteInput.parentNode.appendChild(hr);
         attachNoteTagButtons(noteInput, document.getElementById("note-tag-controls"));
         noteInput.addEventListener("input", () => {
+            this.recordNoteHistory(noteInput.value);
             this.saveCurrentNote();
+        });
+        noteInput.addEventListener("keydown", event => {
+            const modifier = event.ctrlKey || event.metaKey;
+            if (!modifier || event.altKey || event.key.toLowerCase() !== "z") return;
+
+            event.preventDefault();
+            this.changeNoteHistory(event.shiftKey ? "redo" : "undo");
         });
 
         document.getElementById("close-note-keyboard").addEventListener("click", () => {
@@ -108,6 +228,7 @@ export default class Notes {
         // browseNotes
         const browseNotes = document.getElementById("note-browse");
         browseNotes.addEventListener("click", () => {
+            this.editingTemplateIndex = null;
             showElms(document.querySelector("#notes > main"), "section.area", "noteBrowser");
             if (this.mapMaker.currentNoteKey) {
                 showElms(document.querySelector("#notes > main #mainNoteControls"), "button", "");
@@ -155,6 +276,16 @@ export default class Notes {
         })
         const editBack = document.getElementById("note-edit-back");
         editBack.addEventListener("click", () => {
+            if (Number.isInteger(this.editingTemplateIndex)) {
+                this.editingTemplateIndex = null;
+                document.getElementById("noteInput").value = "";
+                showElms(document.querySelector("#notes > main"), "section.area", "noteBrowser");
+                showElms(document.querySelector("#notes > main #mainNoteControls"), "button", "");
+                this.generateCatagories("Templates");
+                clearTooltip();
+                return;
+            }
+
             // go to display area note
             showElms(document.querySelector("#notes > main"), "section.area", "displayAreaNote");
             showElms(document.querySelector("#notes > main #mainNoteControls"), "button", "note-browse", "note-edit", "note-remove");
@@ -306,6 +437,24 @@ export default class Notes {
         }
 
     }
+
+    editTemplate(index) {
+        const template = this.mapMaker.notes.templates?.[index];
+        if (!template) return;
+
+        this.editingTemplateIndex = index;
+        document.getElementById("noteInput").value = template.html;
+        this.resetNoteHistory(template.html);
+        showElms(document.querySelector("#notes > main"), "section.area", "noteEdit");
+        showElms(
+            document.querySelector("#notes > main #mainNoteControls"),
+            "button",
+            "note-edit-back",
+            "close-note-keyboard"
+        );
+        document.getElementById("noteInput").focus();
+        clearTooltip();
+    }
     /**
      * Expands paste tags using saved note variables.
      * @param {string} text - Note text containing paste tags.
@@ -361,9 +510,12 @@ export default class Notes {
         const noteInput = document.getElementById("noteInput");
         noteInput.value = "";
 
+        this.resetNoteHistory("");
+
         if (!note) return;
 
         noteInput.value = note.text;
+        this.resetNoteHistory(note.text);
 
         const noteText = document.createElement("p");
         noteText.innerHTML = this.expandNoteVariables(note.text);
@@ -1348,6 +1500,142 @@ export default class Notes {
             noteBrowser.appendChild(keywordsDetails);
         }
 
+        function createTemplatesSection() {
+            this.mapMaker.notes.templates ??= [];
+            const templatesDetails = document.createElement("details");
+            if (openCatagories.includes("Templates")) {
+                templatesDetails.setAttribute("open", "");
+            }
+            templatesDetails.id = "Templates";
+
+            const templatesSummary = document.createElement("summary");
+            templatesSummary.textContent = "Templates";
+            templatesDetails.appendChild(templatesSummary);
+
+            const hr = document.createElement("hr");
+            hr.style.margin = "0.5rem 0";
+            templatesDetails.appendChild(hr);
+
+            const templatesFieldset = document.createElement("fieldset");
+            templatesFieldset.id = "note-browser-templates";
+            templatesFieldset.classList.add("one-column", "plain");
+
+            const copyTemplate = async (template, copyButton) => {
+                try {
+                    await navigator.clipboard.writeText(template.html);
+                } catch {
+                    const copyInput = document.createElement("textarea");
+                    copyInput.value = template.html;
+                    copyInput.style.position = "fixed";
+                    copyInput.style.opacity = "0";
+                    document.body.appendChild(copyInput);
+                    copyInput.select();
+                    document.execCommand("copy");
+                    copyInput.remove();
+                }
+
+                copyButton.textContent = "Copied!";
+                setTimeout(() => {
+                    copyButton.textContent = `Copy ${template.name}`;
+                }, 1200);
+            };
+
+            const appendTemplate = (template, removable, templateIndex) => {
+                const actionRow = document.createElement("div");
+                actionRow.classList.add("template-action-row");
+
+                const copyButton = document.createElement("button");
+                copyButton.classList.add("nav-note");
+                copyButton.textContent = `Copy ${template.name}`;
+                copyButton.addEventListener("click", () => copyTemplate(template, copyButton));
+                actionRow.appendChild(copyButton);
+
+                if (removable) {
+                    const editButton = document.createElement("button");
+                    editButton.classList.add("template-edit");
+                    editButton.textContent = "Edit";
+                    editButton.addEventListener("click", () => {
+                        this.editTemplate(templateIndex);
+                    });
+                    actionRow.appendChild(editButton);
+
+                    const removeButton = document.createElement("button");
+                    removeButton.classList.add("template-remove");
+                    removeButton.textContent = "Remove";
+                    removeButton.addEventListener("click", () => {
+                        this.mapMaker.notes.templates.splice(templateIndex, 1);
+                        this.generateCatagories("Templates");
+                    });
+                    actionRow.appendChild(removeButton);
+                }
+
+                templatesFieldset.appendChild(actionRow);
+            };
+
+            NOTE_TEMPLATES.forEach(template => {
+                appendTemplate(template, false);
+            });
+            this.mapMaker.notes.templates.forEach((template, index) => {
+                appendTemplate(template, true, index);
+            });
+
+            templatesDetails.appendChild(templatesFieldset);
+
+            const templateName = document.createElement("textarea");
+            templateName.classList.add("note-title", "hide");
+            templateName.placeholder = "Template name...";
+            templateName.rows = 1;
+
+            const templateHtml = document.createElement("textarea");
+            templateHtml.classList.add("note-title", "hide");
+            templateHtml.placeholder = "Template HTML...";
+            templateHtml.rows = 5;
+
+            const saveTemplateButton = document.createElement("button");
+            saveTemplateButton.classList.add("nav-add", "hide");
+            saveTemplateButton.textContent = "Save template";
+            saveTemplateButton.addEventListener("click", () => {
+                const name = templateName.value.trim();
+                const html = templateHtml.value;
+                if (!name || !html.trim()) return;
+
+                this.mapMaker.notes.templates.push({ name, html });
+                this.generateCatagories("Templates");
+            });
+
+            const cancelTemplateButton = document.createElement("button");
+            cancelTemplateButton.classList.add("nav-add", "hide");
+            cancelTemplateButton.textContent = "Cancel";
+            cancelTemplateButton.addEventListener("click", () => {
+                templateName.value = "";
+                templateHtml.value = "";
+                templateName.classList.add("hide");
+                templateHtml.classList.add("hide");
+                saveTemplateButton.classList.add("hide");
+                cancelTemplateButton.classList.add("hide");
+                addTemplateButton.classList.remove("hide");
+            });
+
+            const addTemplateButton = document.createElement("button");
+            addTemplateButton.classList.add("nav-add");
+            addTemplateButton.textContent = "Add template";
+            addTemplateButton.addEventListener("click", () => {
+                addTemplateButton.classList.add("hide");
+                templateName.classList.remove("hide");
+                templateHtml.classList.remove("hide");
+                saveTemplateButton.classList.remove("hide");
+                cancelTemplateButton.classList.remove("hide");
+                templateName.focus();
+            });
+
+            templatesDetails.appendChild(templateName);
+            templatesDetails.appendChild(templateHtml);
+            templatesDetails.appendChild(saveTemplateButton);
+            templatesDetails.appendChild(cancelTemplateButton);
+            templatesDetails.appendChild(addTemplateButton);
+            noteBrowser.appendChild(templatesDetails);
+        }
+
         function getTileNotesSection() {
             const details = document.createElement("details");
             if (openCatagories.includes("Tile Notes")) {
@@ -1587,6 +1875,8 @@ export default class Notes {
         createCharacterNotesSection.call(this);
         addHr(noteBrowser);
         createKeywordsSection.call(this);
+        addHr(noteBrowser);
+        createTemplatesSection.call(this);
         // show tile notes if we have any, otherwise show region notes
         if (Object.keys(this.mapMaker.notes).some(key => /^\d+_\d+_\d+_\d+$/.test(key))) {
             addHr(noteBrowser);

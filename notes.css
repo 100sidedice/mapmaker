@@ -345,6 +345,24 @@ nav {
     padding: 0.4rem;
     width: 100%;
 }
+.template-action-row {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+}
+.template-action-row .nav-note {
+    min-width: 0;
+}
+.template-edit {
+    flex: 0 1 auto !important;
+    width: auto !important;
+    background: #c7ad8a !important;
+}
+.template-remove {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    background: #cba778 !important;
+}
 .note-title {
     width: 100%;
     padding: 0.4rem;
