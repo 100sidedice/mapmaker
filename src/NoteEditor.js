@@ -16,7 +16,10 @@ const TAGS = [
     { name: "details" }, { name: "summary", after: /<details(?:\s[^>]*)?>\s*$/i },
     { name: "random", template: "<random>default, a,b,c</random>", cursor: 8 },
     { name: "value", template: "<value>name:value</value>", cursor: 11 },
-    { name: "keyword", template: "<keyword>name:tooltip</keyword>", cursor: 13 }
+    { name: "keyword", template: "<keyword>name:tooltip</keyword>", cursor: 13 },
+    { name: "textarea", template: '<textarea id="comment">Add a comment</textarea>', cursor: 23 },
+    { name: "bhr", template: "<bhr></bhr>", cursor: 5 },
+    { name: "space", template: "<space></space>", cursor: 7 }
 ];
 
 /**
@@ -51,7 +54,8 @@ export function attachNoteEditor(textarea) {
         }
     });
 
-    textarea.addEventListener("input", () => {
+    textarea.addEventListener("input", event => {
+        if (event.data !== ">") return;
         closeHtmlTag(textarea);
     });
 }

@@ -372,6 +372,8 @@ export default class Notes {
         this.parseValueTags(noteText);
         this.parseLocalKeywordTags(noteText);
         this.parseRandomTags(noteText);
+        this.parseNoteLayoutTags(noteText);
+        this.parseNoteTextareas(noteText, note);
         this.parseDiceExpressions(noteText);
 
         // I will go back later and make it O((Keywords+Globals)*1) instead of O((Keywords*Globals(global note text))*Note text) but for now this is fine.
@@ -433,6 +435,119 @@ export default class Notes {
             style.classList.add("note-style");
             document.head.appendChild(style);
         }
+    }
+
+    /**
+     * Restores editable textarea values and saves changes to the current note.
+     * Textarea ids or names provide stable keys for multiple fields in one note.
+     *
+     * @param {HTMLElement} container
+     * @param {Object} note
+     */
+    parseNoteTextareas(container, note) {
+        const textareas = container.querySelectorAll("textarea");
+        if (!textareas.length) return;
+
+        note.textareas ??= {};
+
+        textareas.forEach((textarea, index) => {
+            textarea.classList.add("note-display-textarea");
+            const listItem = textarea.closest("li");
+            if (listItem) {
+                textarea.classList.add("note-display-textarea-inline");
+                listItem.classList.add("note-display-list-item");
+                if (listItem.closest("ul, ol")) {
+                    listItem.classList.add("note-display-list-item-marked");
+                }
+            }
+            textarea.rows = 1;
+            const key = textarea.id || textarea.name || `textarea-${index + 1}`;
+            const savedValue = note.textareas[key];
+
+            if (savedValue !== undefined) {
+                textarea.value = savedValue;
+            }
+
+            const resizeTextarea = () => {
+                textarea.style.height = "auto";
+                textarea.style.height = `${textarea.scrollHeight}px`;
+            };
+
+            textarea.dataset.noteTextareaKey = key;
+            resizeTextarea();
+            textarea.addEventListener("input", resizeTextarea);
+            textarea.addEventListener("input", () => {
+                if (!this.mapMaker.notes[this.mapMaker.currentNoteKey]) return;
+
+                const currentNote = this.mapMaker.notes[this.mapMaker.currentNoteKey];
+                currentNote.textareas ??= {};
+                currentNote.textareas[key] = textarea.value;
+            });
+
+            if (textarea.classList.contains("note-display-textarea-inline")) {
+                textarea.addEventListener("keydown", event => {
+                    if (event.key !== "Enter") return;
+
+                    const value = this.evaluateInlineMath(textarea.value);
+                    if (value === textarea.value) return;
+
+                    event.preventDefault();
+                    textarea.value = value;
+                    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+                });
+            }
+        });
+    }
+
+    /**
+     * Converts note layout tags into styled display elements.
+     *
+     * @param {HTMLElement} container
+     */
+    parseNoteLayoutTags(container) {
+        container.querySelectorAll("bhr").forEach(boldRule => {
+            const rule = document.createElement("hr");
+            rule.classList.add("note-bold-hr");
+            boldRule.replaceWith(rule);
+        });
+
+        container.querySelectorAll("space").forEach(spaceTag => {
+            const space = document.createElement("span");
+            space.classList.add("note-space");
+            space.setAttribute("aria-hidden", "true");
+            spaceTag.replaceWith(space);
+        });
+    }
+
+    /**
+     * Resolves arithmetic modifiers such as "10 (+5)" in inline note fields.
+     *
+     * @param {string} text
+     * @returns {string}
+     */
+    evaluateInlineMath(text) {
+        const modifierPattern = /(\-?\d+(?:\.\d+)?)\s*\(\s*([+\-*/])\s*(\d+(?:\.\d+)?)\s*\)/g;
+        let result = text;
+
+        for (let pass = 0; pass < 100; pass++) {
+            let changed = false;
+
+            result = result.replace(modifierPattern, (match, base, operator, value) => {
+                try {
+                    const replacement = String(
+                        this.diceRoller.evaluateArithmetic(`${base}${operator}${value}`)
+                    );
+                    changed = replacement !== match;
+                    return replacement;
+                } catch {
+                    return match;
+                }
+            });
+
+            if (!changed) break;
+        }
+
+        return result;
     }
 
     /**
@@ -534,7 +649,7 @@ export default class Notes {
         while (walker.nextNode()) {
             const node = walker.currentNode;
 
-            if (node.parentElement?.closest("[data-dice-expression]")) continue;
+            if (node.parentElement?.closest("textarea, [data-dice-expression]")) continue;
             textNodes.push(node);
         }
 
@@ -711,7 +826,7 @@ export default class Notes {
         const textNodes = [];
 
         while (walker.nextNode()) {
-            if (walker.currentNode.parentElement.closest("span")) continue;
+            if (walker.currentNode.parentElement.closest("textarea, span")) continue;
             textNodes.push(walker.currentNode);
         }
 
