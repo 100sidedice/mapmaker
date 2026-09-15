@@ -10,8 +10,8 @@ const NOTE_TEMPLATES = [
 <details open>
     <summary>Core</summary>
     <ul>
-        <li>Max HP:20<textarea id="comment"></textarea></li>
-        <li>AC:10</li>
+        <li>HP:20<textarea id="hp"></textarea></li>
+        <li>AC:10<textarea id="ac"></textarea></li>
     </ul>
 </details>
 <details>
@@ -36,7 +36,7 @@ const NOTE_TEMPLATES = [
     <li><textarea id="attack-1"></textarea></li>
     <details>
         <summary>Simple swing</summary>
-        <p>Does [1d6] slashing damage</p>
+        <p>Does [1d6(+Dex)] slashing damage</p>
     </details>
 </details>
 <details>
@@ -408,11 +408,18 @@ export default class Notes {
         goButton.addEventListener("click", () => {
             const tileRegex = /^(\d+)_(\d+)_(\d+)_(\d+)$/;
             const regionRegex = /^(\d+)_(\d+)$/;
+            const marker = this.mapMaker.markers.find(item => item.note === this.mapMaker.currentNoteKey);
             if (tileRegex.test(this.mapMaker.currentNoteKey)) {
                 this.mapMaker.TileEngine.centerCamera(this.mapMaker.currentNoteKey);
             }
             if (regionRegex.test(this.mapMaker.currentNoteKey)) {
                 this.mapMaker.RegionEngine.centerCamera(this.mapMaker.currentNoteKey);
+            }
+            if (marker) {
+                const viewportWidth = this.mapMaker.canvas.width / this.mapMaker.dpi;
+                const viewportHeight = this.mapMaker.canvas.height / this.mapMaker.dpi;
+                this.mapMaker.camera.x = marker.x - viewportWidth / (2 * this.mapMaker.camera.zoom);
+                this.mapMaker.camera.y = marker.y - viewportHeight / (2 * this.mapMaker.camera.zoom);
             }
             clearTooltip();
         })
@@ -432,7 +439,8 @@ export default class Notes {
         // if this is a region or tile note, show the Go button
         const regex = /^(\d+)_(\d+)_(\d+)_(\d+)$/;
         const tileRegex = /^(\d+)_(\d+)$/;
-        if (regex.test(key) || tileRegex.test(key)) {
+        const marker = this.mapMaker.markers.find(item => item.note === key);
+        if (regex.test(key) || tileRegex.test(key) || marker) {
             showElms(document.querySelector("#notes > main #mainNoteControls"), "button", "note-browse", "note-edit","note-goto");
         }
 
@@ -521,12 +529,24 @@ export default class Notes {
         noteText.innerHTML = this.expandNoteVariables(note.text);
         displayArea.appendChild(noteText);
 
-        this.parseValueTags(noteText);
-        this.parseLocalKeywordTags(noteText);
-        this.parseRandomTags(noteText);
+        const localValues = this.parseValueTags(noteText);
+        const localKeywords = this.parseLocalKeywordTags(noteText);
+        this.parseRandomTags(noteText, {
+            ...localValues,
+            ...localKeywords.values
+        });
         this.parseNoteLayoutTags(noteText);
         this.parseNoteTextareas(noteText, note);
-        this.parseDiceExpressions(noteText);
+        this.parseDiceExpressions(noteText, {
+            ...localValues,
+            ...localKeywords.values
+        });
+
+        for (const { name, tooltip } of localKeywords.declarations) {
+            this.linkNoteText(noteText, name, span => {
+                addTooltip(span, tooltip);
+            });
+        }
 
         // I will go back later and make it O((Keywords+Globals)*1) instead of O((Keywords*Globals(global note text))*Note text) but for now this is fine.
         for (const keyword of this.mapMaker.notes["keywords"]) {
@@ -708,6 +728,8 @@ export default class Notes {
      * @param {HTMLElement} container
      */
     parseValueTags(container) {
+        const values = {};
+
         container.querySelectorAll("value").forEach(valueTag => {
             const separator = valueTag.textContent.indexOf(":");
             if (separator === -1) return;
@@ -715,21 +737,27 @@ export default class Notes {
             const name = valueTag.textContent.slice(0, separator).trim();
             const value = valueTag.textContent.slice(separator + 1).trim();
             if (!name || !value) return;
+            if (/^[+-]?\d+(?:\.\d+)?$/.test(value)) {
+                values[name] = Number(value);
+            }
 
             const valueSpan = document.createElement("span");
             valueSpan.textContent = name;
             addTooltip(valueSpan, value);
             valueTag.replaceWith(valueSpan);
         });
+
+        return values;
     }
 
     /**
-     * Converts local keyword declarations and links their other occurrences.
+     * Converts local keyword declarations and returns their numeric values.
      *
      * @param {HTMLElement} container
      */
     parseLocalKeywordTags(container) {
         const localKeywords = [];
+        const values = {};
 
         container.querySelectorAll("keyword").forEach(keywordTag => {
             const separator = keywordTag.textContent.indexOf(":");
@@ -738,6 +766,9 @@ export default class Notes {
             const name = keywordTag.textContent.slice(0, separator).trim();
             const tooltip = keywordTag.textContent.slice(separator + 1).trim();
             if (!name || !tooltip) return;
+            if (/^[+-]?\d+(?:\.\d+)?$/.test(tooltip)) {
+                values[name] = Number(tooltip);
+            }
 
             localKeywords.push({ name, tooltip });
 
@@ -747,11 +778,10 @@ export default class Notes {
             keywordTag.replaceWith(keywordSpan);
         });
 
-        for (const { name, tooltip } of localKeywords) {
-            this.linkNoteText(container, name, span => {
-                addTooltip(span, tooltip);
-            });
-        }
+        return {
+            values,
+            declarations: localKeywords
+        };
     }
 
     /**
@@ -760,26 +790,64 @@ export default class Notes {
      *
      * @param {HTMLElement} container
      */
-    parseRandomTags(container) {
+    parseRandomTags(container, values = {}) {
         container.querySelectorAll("random").forEach(randomTag => {
-            const values = randomTag.textContent
+            const tagValues = randomTag.textContent
                 .split(",")
                 .map(value => value.trim())
                 .filter(Boolean);
 
-            if (values.length < 2) return;
+            if (tagValues.length < 2) return;
 
-            const defaultValue = values[0];
-            const options = values.slice(1);
+            const defaultValue = tagValues[0];
+            const rawOptions = tagValues.slice(1);
+            const weightedOptions = rawOptions.map(option => {
+                const match = option.match(/^([+]?(?:\d+(?:\.\d*)?|\.\d+))\s*:\s*(.+)$/);
+
+                if (!match) return null;
+
+                return {
+                    weight: Number(match[1]),
+                    value: match[2].trim()
+                };
+            });
+            const useWeights = weightedOptions.every(option => option !== null) &&
+                weightedOptions.some(option => option.weight > 0) &&
+                weightedOptions.every(option => option.weight >= 0 && option.value);
+            const options = useWeights
+                ? weightedOptions
+                : rawOptions.map(value => ({ value }));
+            const optionLabel = option => useWeights
+                ? `${option.weight}:${option.value}`
+                : option.value;
+            const selectOption = () => {
+                if (!useWeights) {
+                    return options[Math.floor(Math.random() * options.length)].value;
+                }
+
+                const totalWeight = options.reduce(
+                    (total, option) => total + option.weight,
+                    0
+                );
+                let roll = Math.random() * totalWeight;
+
+                for (const option of options) {
+                    roll -= option.weight;
+                    if (roll < 0) return option.value;
+                }
+
+                return options.at(-1).value;
+            };
             const randomSpan = document.createElement("span");
+            randomSpan.dataset.randomTag = "";
             randomSpan.textContent = defaultValue;
             randomSpan.style.cursor = "pointer";
-            addTooltip(randomSpan, `Options: ${options.join(", ")}`);
+            addTooltip(randomSpan, `Options: ${options.map(optionLabel).join(", ")}`);
             randomSpan.addEventListener("click", event => {
                 event.stopPropagation();
-                const option = options[Math.floor(Math.random() * options.length)];
-                randomSpan.textContent = option;
-            });
+                randomSpan.textContent = selectOption();
+                if (event.shiftKey) this.parseDiceExpressions(randomSpan, values);
+                });
 
             randomTag.replaceWith(randomSpan);
         });
@@ -790,7 +858,7 @@ export default class Notes {
      *
      * @param {HTMLElement} noteText
      */
-    parseDiceExpressions(noteText) {
+    parseDiceExpressions(noteText, values = {}) {
         const walker = document.createTreeWalker(
             noteText,
             NodeFilter.SHOW_TEXT
@@ -806,7 +874,7 @@ export default class Notes {
         }
 
         for (const textNode of textNodes) {
-            this.parseDiceTextNode(textNode);
+            this.parseDiceTextNode(textNode, values);
         }
     }
 
@@ -815,9 +883,12 @@ export default class Notes {
 	 *
 	 * @param {Text} textNode
 	 */
-	parseDiceTextNode(textNode) {
+    parseDiceTextNode(textNode, values = {}) {
 		const dicePattern = /\[([^\]]+)\]/g;
 		const text = textNode.nodeValue;
+            const isRandomDice = Boolean(
+                textNode.parentElement?.closest("[data-random-tag]")
+            );
 
 		if (!dicePattern.test(text)) {
 			dicePattern.lastIndex = 0;
@@ -833,7 +904,7 @@ export default class Notes {
 		while ((match = dicePattern.exec(text)) !== null) {
 			const expression = match[1].trim();
 
-			if (!this.diceRollerExpressionIsValid(expression)) continue;
+            if (!this.diceRollerExpressionIsValid(expression)) continue;
 
 			fragment.appendChild(
 				document.createTextNode(text.slice(lastIndex, match.index))
@@ -844,11 +915,15 @@ export default class Notes {
 			diceSpan.textContent = `[${this.formatDiceExpression(expression)}]`;
 			diceSpan.style.cursor = "pointer";
 
-			addTooltip(diceSpan, "Click to roll");
+            addTooltip(
+                diceSpan,
+                isRandomDice ? "Shift-click to roll" : "Click to roll"
+            );
 
 			diceSpan.addEventListener("click", event => {
-				event.stopPropagation();
-				this.rollNoteDice(diceSpan, expression);
+                if (isRandomDice && !event.shiftKey) return;
+                event.stopPropagation();
+                this.rollNoteDice(diceSpan, expression, values);
 			});
 
 			fragment.appendChild(diceSpan);
@@ -896,9 +971,9 @@ export default class Notes {
      * @param {HTMLElement} span
      * @param {string} expression
      */
-    rollNoteDice(span, expression) {
+    rollNoteDice(span, expression, values = {}) {
         try {
-            const result = this.diceRoller.roll(expression);
+            const result = this.diceRoller.roll(expression, values);
             const displayExpression = this.formatDiceExpression(expression);
 
             removeTooltip(span);
@@ -1735,6 +1810,156 @@ export default class Notes {
             }
             noteBrowser.appendChild(details);
         }
+
+        function getMarkerNotesSection() {
+            const markersDetails = document.createElement("details");
+            markersDetails.open = openCatagories.includes("Markers");
+            markersDetails.id = "Markers";
+            const markersSummary = document.createElement("summary");
+            markersSummary.textContent = "Markers";
+            addTooltip(markersSummary, "Named map markers with notes and teleport locations");
+            markersDetails.appendChild(markersSummary);
+
+            const markersFieldset = document.createElement("fieldset");
+            markersFieldset.id = "note-browser-markers";
+            markersFieldset.classList.add("one-column", "plain");
+            markersDetails.appendChild(markersFieldset);
+
+            for (const marker of this.mapMaker.markers) {
+                const key = marker.note;
+                const note = this.mapMaker.notes[key] ||= {
+                    text: "Marker",
+                    color: marker.color || "#ffff00cc"
+                };
+                const createMarkerPreview = () => {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = 48;
+                    canvas.height = 48;
+                    canvas.style.width = "48px";
+                    canvas.style.height = "48px";
+                    canvas.style.justifySelf = "center";
+                    canvas.style.alignSelf = "center";
+                    canvas.style.backgroundColor = "#cba778";
+                    const previewContext = canvas.getContext("2d");
+                    previewContext.fillStyle = note.color || marker.color || "#ffff00cc";
+                    previewContext.beginPath();
+                    previewContext.moveTo(24, 4);
+                    previewContext.lineTo(44, 24);
+                    previewContext.lineTo(24, 44);
+                    previewContext.lineTo(4, 24);
+                    previewContext.closePath();
+                    previewContext.fill();
+                    previewContext.fillStyle = "rgba(0, 0, 0, 0.45)";
+                    previewContext.beginPath();
+                    previewContext.moveTo(24, 14);
+                    previewContext.lineTo(34, 24);
+                    previewContext.lineTo(24, 34);
+                    previewContext.lineTo(14, 24);
+                    previewContext.closePath();
+                    previewContext.fill();
+                    return canvas;
+                };
+                const markerButton = document.createElement("button");
+                markerButton.appendChild(createMarkerPreview());
+                markerButton.style.width = "100%";
+                markerButton.style.marginTop = "0.5rem";
+                markerButton.style.backgroundColor = "#cba778";
+                addTooltip(markerButton, note.text || "Marker");
+                markersDetails.appendChild(markerButton);
+
+                const markerFieldset = document.createElement("fieldset");
+                markerFieldset.id = `browse-marker-${key}-fieldset`;
+                markerFieldset.classList.add("keyword-grid", "hide", "plain");
+
+                const teleportButton = document.createElement("button");
+                teleportButton.textContent = "Teleport";
+                teleportButton.style.gridArea = "copy";
+                teleportButton.addEventListener("click", () => {
+                    this.mapMaker.currentNoteKey = key;
+                    const viewportWidth = this.mapMaker.canvas.width / this.mapMaker.dpi;
+                    const viewportHeight = this.mapMaker.canvas.height / this.mapMaker.dpi;
+                    this.mapMaker.camera.x = marker.x - viewportWidth / (2 * this.mapMaker.camera.zoom);
+                    this.mapMaker.camera.y = marker.y - viewportHeight / (2 * this.mapMaker.camera.zoom);
+                    clearTooltip();
+                });
+                markerFieldset.appendChild(teleportButton);
+
+                let preview = createMarkerPreview();
+                preview.style.gridArea = "name";
+                markerFieldset.appendChild(preview);
+                const nameTextArea = document.createElement("textarea");
+                nameTextArea.value = note.text || "Marker";
+                nameTextArea.placeholder = "Marker name...";
+                nameTextArea.classList.add("note-title");
+                nameTextArea.style.gridArea = "tooltip";
+                nameTextArea.addEventListener("input", () => {
+                    note.text = nameTextArea.value;
+                    removeTooltip(markerButton);
+                    addTooltip(markerButton, nameTextArea.value || "Marker");
+                });
+                markerFieldset.appendChild(nameTextArea);
+
+                const [color, loadHandle] = createColorSlider(markerFieldset, (newColor) => {
+                    note.color = newColor;
+                    marker.color = newColor;
+                    const updatedPreview = createMarkerPreview();
+                    updatedPreview.style.gridArea = "name";
+                    preview.replaceWith(updatedPreview);
+                    preview = updatedPreview;
+                    this.mapMaker.draw();
+                }, false, note.color || marker.color, undefined, undefined, false, true);
+                color.style.gridArea = "color";
+                markerFieldset.appendChild(color);
+
+                const gotoButton = document.createElement("button");
+                gotoButton.textContent = "Go to?";
+                gotoButton.style.gridArea = "goto-name";
+                gotoButton.addEventListener("click", () => {
+                    if (note.goto) this.goto(note.goto);
+                });
+                markerFieldset.appendChild(gotoButton);
+
+                const gotoTextArea = document.createElement("textarea");
+                gotoTextArea.value = note.goto || "";
+                gotoTextArea.placeholder = "Go here on click...";
+                gotoTextArea.classList.add("note-title");
+                gotoTextArea.style.gridArea = "goto";
+                gotoTextArea.addEventListener("input", () => {
+                    note.goto = gotoTextArea.value;
+                });
+                gotoTextArea.addEventListener("blur", () => {
+                    if (!gotoTextArea.value.trim()) delete note.goto;
+                });
+                markerFieldset.appendChild(gotoTextArea);
+
+                const deleteButton = document.createElement("button");
+                deleteButton.textContent = "Delete";
+                deleteButton.style.gridArea = "delete";
+                deleteButton.addEventListener("click", () => {
+                    const index = this.mapMaker.markers.indexOf(marker);
+                    if (index > -1) this.mapMaker.markers.splice(index, 1);
+                    delete this.mapMaker.notes[key];
+                    this.generateCatagories(...getOpenCatagories());
+                });
+                markerFieldset.appendChild(deleteButton);
+                markersDetails.appendChild(markerFieldset);
+
+                markerButton.addEventListener("click", () => {
+                    if (markerFieldset.classList.contains("hide")) {
+                        markerFieldset.classList.remove("hide");
+                        markerButton.replaceChildren(document.createTextNode("Close"));
+                        removeTooltip(markerButton);
+                        loadHandle(note.color || marker.color, false, false);
+                    } else {
+                        markerFieldset.classList.add("hide");
+                        markerButton.replaceChildren(createMarkerPreview());
+                        addTooltip(markerButton, note.text || "Marker");
+                    }
+                });
+            }
+            noteBrowser.appendChild(markersDetails);
+        }
+
         function getGroupNotesSection() {
             const details = document.createElement("details");
             if (openCatagories.includes("Group Notes")) {
@@ -1889,6 +2114,10 @@ export default class Notes {
         if (Object.keys(this.mapMaker.notes).some(key => /^group_/.test(key))) {
             addHr(noteBrowser);
             getGroupNotesSection.call(this);
+        }
+        if (Object.keys(this.mapMaker.notes).some(key => /^marker_/.test(key))) {
+            addHr(noteBrowser);
+            getMarkerNotesSection.call(this);
         }
         if (Object.keys(this.mapMaker.notes).some(key => /^scribble_/.test(key))) {
             addHr(noteBrowser);

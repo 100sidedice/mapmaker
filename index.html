@@ -290,6 +290,43 @@
                     <li>Note that all html tags work - it's just a subset.</li>
                 </ul>
             </details>
+            <details>
+                <summary>Update 3 - Markers</summary>
+                <h3>Markers! (Region scope)</h3>
+                <ul>
+                    <li>You can add a marker to do things like mark say player locations.</li>
+                    <li>The UI for them is similar to keywords, should be easy to figure out.</li>
+                    <li>Just for an example usage, you can put in a character note into the goto box, so picking the marker will take you to the charcter's infomation.</li>
+                </ul>
+                <h3>New HTML element: The textarea</h3>
+                <ul>
+                    <li>I added proper support for the textarea element.</li>
+                    <li>If it's wrapped in &lt;li&gt; tags, it will have some basic calculator functionality.</li>
+                    <li>Basically, "number (+-*/ number)" will be evaluated when you press enter.</li>
+                    <li>You can use this for like tracking a players HP, so you can just type say (-5) and it'll update the value.</li>
+                </ul>
+                <h3>Updated random tag</h3>
+                <ul>
+                    <li>Using the format: "default,num:value,num:name" will use weighted randomization based on the numbers provided.</li>
+                    <li>"test,5:apple,2:banana" will select "apple" with a 5/7 chance and "banana" with a 2/7 chance.</li>
+                    <li>Also, dice tags work in random selections now - note that it requires a shift click to roll the dice when used in this context.</li>
+                </ul>
+                <h3>Updated dice parsing</h3>
+                <ul>
+                    <li>Keywords are now supported in dice expressions.</li>
+                    <li>Doing say "[1d20 (+dex)]" will add the value of the "dex" keyword to the roll now.</li>
+                    <li>(this is local-keywords only created with &lt;keyword&gt; tags) - not the global keywords.</li>
+                </ul>
+                <h3>Charcter templates</h3>
+                <ul>I added a templates catagory, I included a basic charcter template, but you can make your own as well.</ul>
+                <h3>Other</h3>
+                <ul>
+                    <li>Updated ul to have brown borders in notes.</li>
+                    <li>Added a 'bhr' tag (bold-horizontal line)</li>
+                    <li>Added a 'space' tag (1/4th line spacing)</li>
+                </ul>
+
+            </details>
         </aside>
         <button id="close-instructions">Close Information</button>
         <aside id="notes" class="">
@@ -350,6 +387,11 @@
             <button id="paste" class="hide">Paste</button>
             <button id="paste!" class="hide">Paste!!!</button>
             <button id="cancel-paste" class="hide">Cancel</button>
+            <button id="marker" class="hide">Marker</button>
+            <button id="marker-move" class="hide">Move</button>
+            <button id="marker-remove" class="hide">Remove</button>
+            <button id="marker-color" class="hide">Swap Color</button>
+            <button id="marker-cancel" class="hide">Cancel</button>
             <button id="brushSize" class="">Size</button>
             <button id="swap-tile" class="mobile-only">Swap</button>
         </fieldset>

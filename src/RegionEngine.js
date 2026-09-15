@@ -167,6 +167,70 @@ export default class RegionEngine {
             }
         }
 
+        for (const marker of this.mapMaker.markers) {
+            if (marker.x < bounds.left - 20 || marker.x > bounds.right + 20 ||
+                marker.y < bounds.top - 20 || marker.y > bounds.bottom + 20) {
+                continue;
+            }
+            const size = 14;
+            this.ctx.fillStyle = this.mapMaker.notes[marker.note]?.color || marker.color || "#ffff00";
+            this.ctx.beginPath();
+            this.ctx.moveTo(marker.x, marker.y - size);
+            this.ctx.lineTo(marker.x + size, marker.y);
+            this.ctx.lineTo(marker.x, marker.y + size);
+            this.ctx.lineTo(marker.x - size, marker.y);
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+            this.ctx.beginPath();
+            this.ctx.moveTo(marker.x, marker.y - size / 2);
+            this.ctx.lineTo(marker.x + size / 2, marker.y);
+            this.ctx.lineTo(marker.x, marker.y + size / 2);
+            this.ctx.lineTo(marker.x - size / 2, marker.y);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+
+        const hoveredWorldPos = this.localToWorld(this.mouse.x, this.mouse.y);
+        const hoveredMarker = this.mapMaker.markers.find(marker =>
+            Math.hypot(marker.x - hoveredWorldPos.x, marker.y - hoveredWorldPos.y) <= 16
+        );
+        const hoveredMarkerNote = hoveredMarker && this.mapMaker.notes[hoveredMarker.note];
+        if (hoveredMarker && hoveredMarkerNote) {
+            const scale = 1 / this.mapMaker.camera.zoom;
+            const padding = 6 * scale;
+            const fontSize = 14 * scale;
+            const text = hoveredMarkerNote.text || "Marker";
+            this.ctx.save();
+            this.ctx.font = `${fontSize}px sans-serif`;
+            this.ctx.textBaseline = "top";
+            const textWidth = this.ctx.measureText(text).width;
+            const boxX = hoveredMarker.x - (textWidth + padding * 2) / 2;
+            const boxY = hoveredMarker.y + 20 * scale;
+            const boxWidth = textWidth + padding * 2;
+            const boxHeight = fontSize + padding * 2;
+            const radius = 4 * scale;
+            this.ctx.beginPath();
+            this.ctx.moveTo(boxX + radius, boxY);
+            this.ctx.lineTo(boxX + boxWidth - radius, boxY);
+            this.ctx.quadraticCurveTo(boxX + boxWidth, boxY, boxX + boxWidth, boxY + radius);
+            this.ctx.lineTo(boxX + boxWidth, boxY + boxHeight - radius);
+            this.ctx.quadraticCurveTo(boxX + boxWidth, boxY + boxHeight, boxX + boxWidth - radius, boxY + boxHeight);
+            this.ctx.lineTo(boxX + radius, boxY + boxHeight);
+            this.ctx.quadraticCurveTo(boxX, boxY + boxHeight, boxX, boxY + boxHeight - radius);
+            this.ctx.lineTo(boxX, boxY + radius);
+            this.ctx.quadraticCurveTo(boxX, boxY, boxX + radius, boxY);
+            this.ctx.closePath();
+            this.ctx.fillStyle = "#c7ad8a";
+            this.ctx.fill();
+            this.ctx.strokeStyle = "#664c2e";
+            this.ctx.lineWidth = 2 * scale;
+            this.ctx.stroke();
+            this.ctx.fillStyle = "#332416";
+            this.ctx.fillText(text, boxX + padding, boxY + padding);
+            this.ctx.restore();
+        }
+
         // draw clipboard preview
         if (this.config.showPreview && this.mapMaker.clipboard?.regions) {
             const worldPos = this.mapMaker.screenToWorld(this.mouse.x, this.mouse.y);
@@ -377,6 +441,16 @@ export default class RegionEngine {
         };
     }
 
+    localToWorld(x, y) {
+        const rect = this.mapMaker.canvas.getBoundingClientRect();
+        const canvasX = x * (this.mapMaker.canvas.width / rect.width) / this.mapMaker.dpi;
+        const canvasY = y * (this.mapMaker.canvas.height / rect.height) / this.mapMaker.dpi;
+        return {
+            x: canvasX / this.mapMaker.camera.zoom + this.mapMaker.camera.x,
+            y: canvasY / this.mapMaker.camera.zoom + this.mapMaker.camera.y
+        };
+    }
+
     getMouseTile() {
         const worldPos = this.mapMaker.screenToWorld(this.mouse.x, this.mouse.y);
 
@@ -490,10 +564,32 @@ export default class RegionEngine {
                     }
                 },
                 "release-action": () => {
+                    if (this.config.markerCtrlClick) {
+                        this.config.markerCtrlClick = false;
+                        this.config.ctrl = false;
+                        return;
+                    }
                     this.config.ctrl = false;
                     if (this.mouse.trackpadMode && this.mouse.trackpadScrollDistance >= 30) return;
+                    const worldPos = this.localToWorld(this.mouse.x, this.mouse.y);
+                    let selectedMarker = null;
+                    let closestDistance = 16;
+                    for (const marker of this.mapMaker.markers) {
+                        const distance = Math.hypot(marker.x - worldPos.x, marker.y - worldPos.y);
+                        if (distance <= closestDistance) {
+                            selectedMarker = marker;
+                            closestDistance = distance;
+                        }
+                    }
+                    if (selectedMarker) {
+                        this.config.selectedMarker = this.mapMaker.markers.indexOf(selectedMarker);
+                        this.config.markerMode = "edit";
+                        this.config.lastPickedGroup = "";
+                        const markerNote = this.mapMaker.notes[selectedMarker.note];
+                        this.mapMaker.Notes.goto(markerNote?.goto || selectedMarker.note);
+                        return;
+                    }
                     this.config.lastPickedGroup = ""
-                    const worldPos = this.mapMaker.screenToWorld(this.mouse.x, this.mouse.y);
                     const regionX = Math.floor(worldPos.x / 256);
                     const regionY = Math.floor(worldPos.y / 256);
                     const key = `${regionX}_${regionY}`;
@@ -719,6 +815,33 @@ export default class RegionEngine {
     
     loadMouse(mouse){
         this.mouse = mouse;
+
+        this.mouse.hook("left-down", "marker-select", (pos, event) => {
+            if (!this.config.ctrl) return;
+            const worldPos = this.localToWorld(pos.x, pos.y);
+            let selectedIndex = -1;
+            let closestDistance = 16;
+            this.mapMaker.markers.forEach((marker, index) => {
+                const distance = Math.hypot(marker.x - worldPos.x, marker.y - worldPos.y);
+                if (distance <= closestDistance) {
+                    selectedIndex = index;
+                    closestDistance = distance;
+                }
+            });
+            if (selectedIndex < 0) return;
+            event.consume();
+            this.config.selectedMarker = selectedIndex;
+            this.config.markerMode = "edit";
+            this.config.markerCtrlClick = !this.config.ctrlFromButton;
+            this.config.ctrl = false;
+            this.config.ctrlFromButton = false;
+            this.mouse.unhook("left-down", "eyedrop");
+            const marker = this.mapMaker.markers[selectedIndex];
+            const markerNote = this.mapMaker.notes[marker.note];
+            this.mapMaker.Notes.goto(markerNote?.goto || marker.note);
+            this.mouse.pause("left-hold", 0.5);
+            this.mouse.pause("left-down", 0.5);
+        }, -200);
 
         // preview for pasting clipboard
         this.mouse.hook("right-hold", "region-clipboard-preview", (pos)=>{

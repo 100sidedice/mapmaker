@@ -14,9 +14,10 @@ export default class DiceRoller {
 	 * Evaluates a complete dice expression.
 	 *
 	 * @param {string} expression
+	 * @param {Object<string, number>} values
 	 * @returns {{total: number, breakdown: string}}
 	 */
-	roll(expression) {
+	roll(expression, values = {}) {
 		const cleaned = expression.replace(/\s+/g, " ").trim();
 		const dicePattern = /(\d*)d(\d+)/gi;
 
@@ -39,7 +40,8 @@ export default class DiceRoller {
 
 			const modifierData = this.parseFollowingModifiers(
 				cleaned,
-				dicePattern.lastIndex
+				dicePattern.lastIndex,
+				values
 			);
 
 			const roll = this.rollPool(
@@ -88,7 +90,7 @@ export default class DiceRoller {
 	 * @param {number} startIndex
 	 * @returns {{mode: string|null, modifiers: Array, endIndex: number}}
 	 */
-	parseFollowingModifiers(expression, startIndex) {
+	parseFollowingModifiers(expression, startIndex, values = {}) {
 		const modifiers = [];
 		let mode = null;
 		let index = startIndex;
@@ -99,7 +101,7 @@ export default class DiceRoller {
 
 			if (!match) break;
 
-			const parsed = this.parseModifier(match[1]);
+			const parsed = this.parseModifier(match[1], values);
 
 			if (parsed.mode) {
 				if (mode && mode !== parsed.mode) {
@@ -145,9 +147,10 @@ export default class DiceRoller {
 	 * Parses a dice modifier.
 	 *
 	 * @param {string|undefined} modifierText
+	 * @param {Object<string, number>} values
 	 * @returns {{mode: string|null, operator: string|null, value: number|null}}
 	 */
-	parseModifier(modifierText) {
+	parseModifier(modifierText, values = {}) {
 		if (!modifierText) {
 			return {
 				mode: null,
@@ -159,19 +162,21 @@ export default class DiceRoller {
 		const text = modifierText.trim().toLowerCase();
 
 		const modifierMatch = text.match(
-			/^([+\-*/])\s*(\d+(?:\.\d+)?)$/
+			/^([+\-*/])\s*(\d+(?:\.\d+)?|[a-z_][\w-]*)$/i
 		);
 
 		if (modifierMatch) {
+			const value = this.resolveValue(modifierMatch[2], values);
+
 			return {
 				mode: null,
 				operator: modifierMatch[1],
-				value: Number(modifierMatch[2])
+				value
 			};
 		}
 
 		const modeMatch = text.match(
-			/^(advantage|disadvantage|adv|dis|adv-all|dis-all)(?:\s*([+\-*/])\s*(\d+(?:\.\d+)?))?$/
+			/^(advantage|disadvantage|adv|dis|adv-all|dis-all)(?:\s*([+\-*/])\s*(\d+(?:\.\d+)?|[a-z_][\w-]*))?$/i
 		);
 
 		if (modeMatch) {
@@ -187,11 +192,34 @@ export default class DiceRoller {
 			return {
 				mode,
 				operator: modeMatch[2] || null,
-				value: modeMatch[3] ? Number(modeMatch[3]) : null
+				value: modeMatch[3]
+					? this.resolveValue(modeMatch[3], values)
+					: null
 			};
 		}
 
 		throw new Error(`Invalid dice modifier: (${modifierText})`);
+	}
+
+	/**
+	 * Resolves a numeric literal or a named local value.
+	 *
+	 * @param {string} value
+	 * @param {Object<string, number>} values
+	 * @returns {number}
+	 */
+	resolveValue(value, values) {
+		if (/^\d+(?:\.\d+)?$/.test(value)) return Number(value);
+
+		const key = Object.keys(values).find(
+			name => name.toLowerCase() === value.toLowerCase()
+		);
+
+		if (!key || !Number.isFinite(values[key])) {
+			throw new Error(`Unknown dice value: ${value}`);
+		}
+
+		return values[key];
 	}
 
 	/**

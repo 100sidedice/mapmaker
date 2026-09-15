@@ -61,6 +61,7 @@ class MapMaker extends App{
 		this.regionTypes = new Map();  // hash -> { count, tiles }
 		
 		this.annotations = []; // {color, points:[{x,y}], left, top, right, bottom}
+		this.markers = [];
 		this.regions = {};
 		this.lastPicked = null;
 
@@ -73,6 +74,7 @@ class MapMaker extends App{
 				config: this.config,
 				zoomLevel: this.zoomLevel,
 				annotations: this.annotations,
+				markers: this.markers,
 			};
 		};
 		this.zoomLevel = 1; // 0 = pixel, 1 = tile, 2 = region
@@ -89,7 +91,11 @@ class MapMaker extends App{
 			annotate_color: "#FF0000",
 			lastPickedRegion: null,
 			lastPickedGroup: null,
-			lastPicked: null
+			lastPicked: null,
+			markerMode: false,
+			selectedMarker: null,
+			markerCtrlClick: false,
+			ctrlFromButton: false
 		}
 		this.zoomLevel = 1;
 		// give a default region type (default hash is filled floor with wall outline)
@@ -116,6 +122,7 @@ class MapMaker extends App{
 			if (save.notes) this.notes = save.notes;
 			if (save.zoomLevel !== undefined) this.zoomLevel = save.zoomLevel;
 			if (save.annotations) this.annotations = save.annotations;
+			if (save.markers) this.markers = save.markers;
 
 			// Normalize map first
 			for (const key in this.map) {
@@ -154,6 +161,7 @@ class MapMaker extends App{
 			this.notes = save.notes ?? this.notes;
 			this.zoomLevel = save.zoomLevel ?? this.zoomLevel;
 			this.annotations = save.annotations ?? this.annotations;
+			this.markers = save.markers ?? this.markers;
 		}
 
 		await this.loadImages(save?.images);
@@ -508,7 +516,8 @@ class MapMaker extends App{
 				camera: this.camera,
 				config: this.config,
 				zoomLevel: this.zoomLevel,
-				annotations: this.annotations
+				annotations: this.annotations,
+				markers: this.markers
 			});
 
 			const blob = new Blob([json], { type: 'application/json' });
@@ -541,6 +550,7 @@ class MapMaker extends App{
 					if (save.config) this.config = save.config;
 					if (save.zoomLevel) this.zoomLevel = save.zoomLevel;
 					if (save.annotations) this.annotations = save.annotations;
+					if (save.markers) this.markers = save.markers;
 					else this.regionTypes = new Map();
 					
 					// normalize old map formats
@@ -665,9 +675,11 @@ class MapMaker extends App{
 				this.mouse.unhook("left-down","eyedrop");
 				this.keyMap["Control"]["release-action"]();
 				this.config.ctrl = false;
+				this.config.ctrlFromButton = false;
 				return;
 			}
 			this.config.ctrl = true;
+			this.config.ctrlFromButton = true;
 			this.mouse.weakHook("left-down","eyedrop", (pos, event) => {
 				event.consume();
 				this.keyMap["Control"]["action"]();
@@ -718,6 +730,61 @@ class MapMaker extends App{
 			}
 			this.mouse.weakHook("left-hold","copy", copy, "low", this);
 		});
+		const markerButton = document.getElementById("marker");
+		const markerMoveButton = document.getElementById("marker-move");
+		const markerRemoveButton = document.getElementById("marker-remove");
+		const markerColorButton = document.getElementById("marker-color");
+		const markerCancelButton = document.getElementById("marker-cancel");
+		const markerColors = ["#ff0000cc", "#00ff00cc", "#0000ffcc", "#ffff00cc", "#ff00ffcc", "#00ffffcc", "#ffffffcc", "#000000cc"];
+		const cancelMarkerAction = () => {
+			this.mouse.unhook("left-down", "marker-placement");
+			this.config.markerMode = false;
+			this.config.selectedMarker = null;
+		};
+		const pickMarkerLocation = (callback, mode = "place") => {
+			this.config.markerMode = mode;
+			this.mouse.weakHook("left-down", "marker-placement", (pos, event) => {
+				event.consume();
+				callback(this.screenToWorld(pos.x, pos.y));
+				this.mouse.pause("left-hold", 0.5);
+				cancelMarkerAction();
+			}, "low");
+		};
+		markerButton.addEventListener("click", () => {
+			if (this.config.markerMode === "place") {
+				cancelMarkerAction();
+				return;
+			}
+			pickMarkerLocation((worldPos) => {
+				const id = `marker_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+				this.markers.push({ x: worldPos.x, y: worldPos.y, color: this.config.selectedColor, note: id });
+				this.notes[id] = { text: "", color: this.config.selectedColor };
+				this.Notes.generateCatagories("Markers");
+			});
+		});
+		markerMoveButton.addEventListener("click", () => {
+			const marker = this.markers[this.config.selectedMarker];
+			if (!marker) return;
+			pickMarkerLocation((worldPos) => {
+				marker.x = worldPos.x;
+				marker.y = worldPos.y;
+			}, "move");
+		});
+		markerRemoveButton.addEventListener("click", () => {
+			const marker = this.markers[this.config.selectedMarker];
+			if (!marker) return;
+			this.markers.splice(this.config.selectedMarker, 1);
+			delete this.notes[marker.note];
+			cancelMarkerAction();
+		});
+		markerColorButton.addEventListener("click", () => {
+			const marker = this.markers[this.config.selectedMarker];
+			if (!marker) return;
+			const colorIndex = markerColors.indexOf(marker.color);
+			marker.color = markerColors[(colorIndex + 1) % markerColors.length];
+			if (this.notes[marker.note]) this.notes[marker.note].color = marker.color;
+		});
+		markerCancelButton.addEventListener("click", cancelMarkerAction);
 		const pasteButton = document.getElementById("paste");
 		pasteButton.addEventListener("click", () => {
 			this.keyMap["v"]["action"]();
@@ -955,6 +1022,26 @@ class MapMaker extends App{
 
 			this.config.buttonCopyState = hidden;
 		}
+		function updateMarkerButtons() {
+			const buttons = ["marker", "marker-move", "marker-remove", "marker-color", "marker-cancel"];
+			const standardButtons = ["erase", "select", "eyedrop", "fill", "annotate", "undo", "outline", "group", "cut", "copy", "paste", "paste!", "cancel-paste", "brushSize", "swap-tile"];
+			const editing = this.zoomLevel === 2 && ["edit", "move"].includes(this.config.markerMode) && this.config.selectedMarker !== null;
+			const placing = this.zoomLevel === 2 && this.config.markerMode === "place";
+			buttons.forEach(id => document.getElementById(id).classList.add("hide"));
+			document.getElementById("marker-move").classList.remove("toggled");
+			standardButtons.forEach(id => {
+				const button = document.getElementById(id);
+				if (editing || placing) button.classList.add("hide");
+			});
+			if (editing) {
+				["marker-move", "marker-remove", "marker-color", "marker-cancel"].forEach(id => document.getElementById(id).classList.remove("hide"));
+				document.getElementById("marker-move").classList.toggle("toggled", this.config.markerMode === "move");
+			} else if (!this.config.showPreview && !placing && this.zoomLevel === 2) {
+				document.getElementById("marker").classList.remove("hide");
+			} else if (placing) {
+				document.getElementById("marker-cancel").classList.remove("hide");
+			}
+		}
 		// cut
 		function updateCutButton() {
 			const button = document.getElementById("cut");
@@ -1031,6 +1118,7 @@ class MapMaker extends App{
 		updateCancelPasteButton.call(this);
 		updateSizeButton.call(this);
 		updateEraseButton.call(this);
+		updateMarkerButtons.call(this);
 	}
 	update(){
 		this.mouse.update();

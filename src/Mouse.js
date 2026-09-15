@@ -117,6 +117,10 @@ export default class Mouse {
             } else {
                 this.wheel += e.deltaY;
             }
+            // if not trackpad mode, and deltas are small, scale up
+            if (!this.trackpadMode && Math.abs(e.deltaY) < 10) {
+                this.wheel += e.deltaY * 15;
+            }
             this.runHook('wheel', this.getPos(), e.deltaY, e);
         });
 
@@ -529,6 +533,7 @@ export default class Mouse {
         if (this.get("middle")) {
             this.trackpadMode = false;
         }
+        
 
         for (const button in this.buttons) {
             if (this.get(button)) {
