@@ -168,6 +168,27 @@ section.area {
     font-family: inherit;
     resize: vertical;
     line-height: 1.4;
+	table {
+	    width: 100%;
+	    outline:0.25rem solid #885500;
+	    border-collapse: collapse; 
+	}
+	thead tr {
+	    border-bottom: 0.25rem solid #885500;
+	}
+	th, td {
+	    padding: 0.25rem 0.5rem;
+	    text-align: left;
+	}
+	th + th, td + td {
+	    border-left: 0.25rem solid #885500;
+	}
+	tbody tr:not(:last-child){
+	    border-bottom: 0.25rem solid #88550077;
+	}
+	tbody tr:nth-child(even) {
+	    background-color: #88550022;
+	}
 }
 
 #noteDisplay fieldset {
