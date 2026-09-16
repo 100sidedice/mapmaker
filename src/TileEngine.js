@@ -130,6 +130,58 @@ export default class TileEngine {
             }
         }
 
+        for (const marker of this.mapMaker.markers) {
+            if (marker.x < bounds.left - 20 || marker.x > bounds.right + 20 ||
+                marker.y < bounds.top - 20 || marker.y > bounds.bottom + 20) {
+                continue;
+            }
+            const size = 14;
+            this.ctx.fillStyle = this.mapMaker.notes[marker.note]?.color || marker.color || "#ffff00";
+            this.ctx.beginPath();
+            this.ctx.moveTo(marker.x, marker.y - size);
+            this.ctx.lineTo(marker.x + size, marker.y);
+            this.ctx.lineTo(marker.x, marker.y + size);
+            this.ctx.lineTo(marker.x - size, marker.y);
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+            this.ctx.beginPath();
+            this.ctx.moveTo(marker.x, marker.y - size / 2);
+            this.ctx.lineTo(marker.x + size / 2, marker.y);
+            this.ctx.lineTo(marker.x, marker.y + size / 2);
+            this.ctx.lineTo(marker.x - size / 2, marker.y);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+
+        const hoveredWorldPos = this.mapMaker.screenToWorld(this.mouse.x, this.mouse.y);
+        const hoveredMarker = this.mapMaker.markers.find(marker =>
+            Math.hypot(marker.x - hoveredWorldPos.x, marker.y - hoveredWorldPos.y) <= 16
+        );
+        const hoveredMarkerNote = hoveredMarker && this.mapMaker.notes[hoveredMarker.note];
+        if (hoveredMarker && hoveredMarkerNote) {
+            const scale = 1 / this.mapMaker.camera.zoom;
+            const padding = 6 * scale;
+            const fontSize = 14 * scale;
+            const text = hoveredMarkerNote.text || "Marker";
+            this.ctx.save();
+            this.ctx.font = `${fontSize}px sans-serif`;
+            this.ctx.textBaseline = "top";
+            const textWidth = this.ctx.measureText(text).width;
+            const boxX = hoveredMarker.x - (textWidth + padding * 2) / 2;
+            const boxY = hoveredMarker.y + 20 * scale;
+            const boxWidth = textWidth + padding * 2;
+            const boxHeight = fontSize + padding * 2;
+            this.ctx.fillStyle = "#c7ad8a";
+            this.ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+            this.ctx.strokeStyle = "#664c2e";
+            this.ctx.lineWidth = 2 * scale;
+            this.ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+            this.ctx.fillStyle = "#332416";
+            this.ctx.fillText(text, boxX + padding, boxY + padding);
+            this.ctx.restore();
+        }
+
         // draw clipboard preview
         if (this.config.showPreview && this.mapMaker.clipboard) {
             const worldPos = this.mapMaker.screenToWorld(this.mouse.x, this.mouse.y);
@@ -574,6 +626,23 @@ export default class TileEngine {
                     this.config.ctrl = false;
                     if (this.mouse.trackpadMode && this.mouse.trackpadScrollDistance >= 30) return;
                     const worldPos = this.mapMaker.screenToWorld(this.mouse.x, this.mouse.y);
+
+                    let closestDistance = 16;
+                    let selectedMarker = null;
+                    for (const marker of this.mapMaker.markers) {
+                        const distance = Math.hypot(marker.x - worldPos.x, marker.y - worldPos.y);
+                        if (distance <= closestDistance) {
+                            selectedMarker = marker;
+                            closestDistance = distance;
+                        }
+                    }
+                    if (selectedMarker) {
+                        this.config.selectedMarker = this.mapMaker.markers.indexOf(selectedMarker);
+                        this.config.markerMode = "edit";
+                        this.mapMaker.Notes.gotoMarker(selectedMarker);
+                        return;
+                    }
+                    this.config.selectedMarker = null;
                     
                     if (this.config.annotate) {
                         // goto annotation note.
@@ -863,6 +932,31 @@ export default class TileEngine {
     
     loadMouse(mouse){
         this.mouse = mouse;
+
+        this.mouse.hook("left-down", "tile-marker-select", (pos, event) => {
+            if (!this.config.ctrl) return;
+            const worldPos = this.mapMaker.screenToWorld(pos.x, pos.y);
+            let selectedIndex = -1;
+            let closestDistance = 16;
+            this.mapMaker.markers.forEach((marker, index) => {
+                const distance = Math.hypot(marker.x - worldPos.x, marker.y - worldPos.y);
+                if (distance <= closestDistance) {
+                    selectedIndex = index;
+                    closestDistance = distance;
+                }
+            });
+            if (selectedIndex < 0) return;
+            event.consume();
+            this.config.selectedMarker = selectedIndex;
+            this.config.markerMode = "edit";
+            this.config.ctrl = false;
+            this.config.ctrlFromButton = false;
+            this.mouse.unhook("left-down", "eyedrop");
+            this.mapMaker.Notes.gotoMarker(this.mapMaker.markers[selectedIndex]);
+            this.mouse.pause("left-hold", 0.5);
+            this.mouse.pause("left-down", 0.5);
+        }, -200);
+
         // annotate logic
         this.mouse.hook("left-down", "tile-annotate-start", (pos,event)=>{
             if (!this.config.annotate) return;

@@ -564,16 +564,14 @@ export default class RegionEngine {
                     }
                 },
                 "release-action": () => {
-                    if (this.config.markerCtrlClick) {
-                        this.config.markerCtrlClick = false;
-                        this.config.ctrl = false;
-                        return;
-                    }
                     this.config.ctrl = false;
                     if (this.mouse.trackpadMode && this.mouse.trackpadScrollDistance >= 30) return;
                     const worldPos = this.localToWorld(this.mouse.x, this.mouse.y);
-                    let selectedMarker = null;
+                    this.config.lastPickedGroup = ""
+                    
+                    // Marker
                     let closestDistance = 16;
+                    let selectedMarker = null;
                     for (const marker of this.mapMaker.markers) {
                         const distance = Math.hypot(marker.x - worldPos.x, marker.y - worldPos.y);
                         if (distance <= closestDistance) {
@@ -584,12 +582,12 @@ export default class RegionEngine {
                     if (selectedMarker) {
                         this.config.selectedMarker = this.mapMaker.markers.indexOf(selectedMarker);
                         this.config.markerMode = "edit";
-                        this.config.lastPickedGroup = "";
-                        const markerNote = this.mapMaker.notes[selectedMarker.note];
-                        this.mapMaker.Notes.goto(markerNote?.goto || selectedMarker.note);
+                        this.mapMaker.Notes.gotoMarker(selectedMarker);
                         return;
+                    } else {
+                        this.config.selectedMarker = null;
                     }
-                    this.config.lastPickedGroup = ""
+                    
                     const regionX = Math.floor(worldPos.x / 256);
                     const regionY = Math.floor(worldPos.y / 256);
                     const key = `${regionX}_${regionY}`;
@@ -832,13 +830,11 @@ export default class RegionEngine {
             event.consume();
             this.config.selectedMarker = selectedIndex;
             this.config.markerMode = "edit";
-            this.config.markerCtrlClick = !this.config.ctrlFromButton;
             this.config.ctrl = false;
             this.config.ctrlFromButton = false;
             this.mouse.unhook("left-down", "eyedrop");
             const marker = this.mapMaker.markers[selectedIndex];
-            const markerNote = this.mapMaker.notes[marker.note];
-            this.mapMaker.Notes.goto(markerNote?.goto || marker.note);
+            this.mapMaker.Notes.gotoMarker(marker);
             this.mouse.pause("left-hold", 0.5);
             this.mouse.pause("left-down", 0.5);
         }, -200);

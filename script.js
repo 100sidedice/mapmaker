@@ -94,7 +94,6 @@ class MapMaker extends App{
 			lastPicked: null,
 			markerMode: false,
 			selectedMarker: null,
-			markerCtrlClick: false,
 			ctrlFromButton: false
 		}
 		this.zoomLevel = 1;
@@ -733,9 +732,7 @@ class MapMaker extends App{
 		const markerButton = document.getElementById("marker");
 		const markerMoveButton = document.getElementById("marker-move");
 		const markerRemoveButton = document.getElementById("marker-remove");
-		const markerColorButton = document.getElementById("marker-color");
 		const markerCancelButton = document.getElementById("marker-cancel");
-		const markerColors = ["#ff0000cc", "#00ff00cc", "#0000ffcc", "#ffff00cc", "#ff00ffcc", "#00ffffcc", "#ffffffcc", "#000000cc"];
 		const cancelMarkerAction = () => {
 			this.mouse.unhook("left-down", "marker-placement");
 			this.config.markerMode = false;
@@ -776,13 +773,6 @@ class MapMaker extends App{
 			this.markers.splice(this.config.selectedMarker, 1);
 			delete this.notes[marker.note];
 			cancelMarkerAction();
-		});
-		markerColorButton.addEventListener("click", () => {
-			const marker = this.markers[this.config.selectedMarker];
-			if (!marker) return;
-			const colorIndex = markerColors.indexOf(marker.color);
-			marker.color = markerColors[(colorIndex + 1) % markerColors.length];
-			if (this.notes[marker.note]) this.notes[marker.note].color = marker.color;
 		});
 		markerCancelButton.addEventListener("click", cancelMarkerAction);
 		const pasteButton = document.getElementById("paste");
@@ -859,6 +849,7 @@ class MapMaker extends App{
 			if (this.zoomLevel === 0) hidden = true;
 			if (this.zoomLevel === 1 && this.config.annotate) hidden = true;
 			if (this.config.showPreview) hidden = true;
+			if (this.config.selectedMarker !== null) hidden = true;
 
 			if (!hidden) selectButton.classList.remove("hide");
 			else  selectButton.classList.add("hide");
@@ -881,6 +872,7 @@ class MapMaker extends App{
 			let hidden = false;
 			if (this.zoomLevel === 1 && this.config.selectionExists) hidden = true;
 			if (this.config.showPreview) hidden = true;
+			if (this.config.selectedMarker !== null) hidden = true;
 
 			if (!hidden) button.classList.remove("hide");
 			else  button.classList.add("hide");
@@ -902,6 +894,7 @@ class MapMaker extends App{
 			if (this.zoomLevel === 3) hidden = true;
 			if (this.config.annotate) hidden = true;
 			if (this.config.showPreview) hidden = true;
+			if (this.config.selectedMarker !== null) hidden = true;
 
 			if (!hidden) button.classList.remove("hide");
 			else  button.classList.add("hide");
@@ -929,6 +922,7 @@ class MapMaker extends App{
 			if (this.zoomLevel === 2) hidden = true;
 			if (this.zoomLevel === 3) hidden = true;
 			if (this.config.showPreview) hidden = true;
+			if (this.config.selectedMarker !== null) hidden = true;
 
 			if (!hidden) button.classList.remove("hide");
 			else  button.classList.add("hide");
@@ -945,6 +939,7 @@ class MapMaker extends App{
 			const button = document.getElementById("erase");
 			// Hide
 			let hidden = false;
+			if (this.config.selectedMarker !== null) hidden = true;
 			if (this.config.showPreview) hidden = true;
 
 			if (!hidden) button.classList.remove("hide");
@@ -967,13 +962,13 @@ class MapMaker extends App{
 			if (this.zoomLevel === 1 && !this.config.annotate) hidden = true;
 			if (this.zoomLevel === 2) hidden = true;
 			if (this.zoomLevel === 3) hidden = true;
+			if (this.config.selectedMarker !== null) hidden = true;
 			if (this.config.showPreview) hidden = true;
 
 			if (!hidden) button.classList.remove("hide");
 			else  button.classList.add("hide");
 			this.config.buttonUndoAnnotateState = hidden;
 		}
-
 		// outline
 		function updateOutlineButton() {
 			const button = document.getElementById("outline");
@@ -983,6 +978,7 @@ class MapMaker extends App{
 			if (this.zoomLevel === 1 && !this.config.selectionExists) hidden = true;
 			if (this.zoomLevel === 2) hidden = true;
 			if (this.zoomLevel === 3) hidden = true;
+			if (this.config.selectedMarker !== null) hidden = true;
 			if (this.config.showPreview) hidden = true;
 
 			if (!hidden) button.classList.remove("hide");
@@ -999,12 +995,11 @@ class MapMaker extends App{
 			if (this.zoomLevel === 1) hidden = true;
 			if (this.zoomLevel === 2 && !this.config.regionSelectionExists) hidden = true;
 			if (this.zoomLevel === 3) hidden = true;
+			if (this.config.selectedMarker !== null) hidden = true;
 			if (this.config.showPreview) hidden = true;
 
 			if (!hidden) button.classList.remove("hide");
 			else  button.classList.add("hide");
-
-			this.config.buttonGroupState = hidden;
 		}
 		// copy
 		function updateCopyButton() {
@@ -1016,30 +1011,52 @@ class MapMaker extends App{
 			if (this.zoomLevel === 2 && !this.config.regionSelectionExists) hidden = true;
 			if (this.zoomLevel === 3) hidden = true;
 			if (this.config.showPreview) hidden = true;
+			if (this.config.selectedMarker !== null) hidden = true;
+			
+			if (!hidden) button.classList.remove("hide");
+			else  button.classList.add("hide");
+		}
+		function updateMarkerButton() {
+			const button = document.getElementById("marker");
+			// Hide
+			let hidden = false;
+			if (this.config.selectedMarker !== null) hidden = true;
+			if (this.zoomLevel === 0) hidden = true;
+			if (this.zoomLevel === 1 && this.config.selectionExists) hidden = true;
+			if (this.zoomLevel === 2 && this.config.regionSelectionExists) hidden = true;
+			if (this.zoomLevel === 3) hidden = true;
+			if (this.config.showPreview) hidden = true;
 			
 			if (!hidden) button.classList.remove("hide");
 			else  button.classList.add("hide");
 
-			this.config.buttonCopyState = hidden;
+			// toggle button on if we're placing a marker
+			if (this.config.markerMode === "place") {
+				button.classList.add("toggled");
+			} else {
+				button.classList.remove("toggled");
+			}
 		}
 		function updateMarkerButtons() {
-			const buttons = ["marker", "marker-move", "marker-remove", "marker-color", "marker-cancel"];
-			const standardButtons = ["erase", "select", "eyedrop", "fill", "annotate", "undo", "outline", "group", "cut", "copy", "paste", "paste!", "cancel-paste", "brushSize", "swap-tile"];
-			const editing = this.zoomLevel === 2 && ["edit", "move"].includes(this.config.markerMode) && this.config.selectedMarker !== null;
-			const placing = this.zoomLevel === 2 && this.config.markerMode === "place";
-			buttons.forEach(id => document.getElementById(id).classList.add("hide"));
-			document.getElementById("marker-move").classList.remove("toggled");
-			standardButtons.forEach(id => {
-				const button = document.getElementById(id);
-				if (editing || placing) button.classList.add("hide");
-			});
-			if (editing) {
-				["marker-move", "marker-remove", "marker-color", "marker-cancel"].forEach(id => document.getElementById(id).classList.remove("hide"));
-				document.getElementById("marker-move").classList.toggle("toggled", this.config.markerMode === "move");
-			} else if (!this.config.showPreview && !placing && this.zoomLevel === 2) {
-				document.getElementById("marker").classList.remove("hide");
-			} else if (placing) {
-				document.getElementById("marker-cancel").classList.remove("hide");
+			for (const buttonId of ["marker-move", "marker-remove", "marker-cancel"]) {
+				const button = document.getElementById(buttonId);
+				// Hide
+				let hidden = false;
+				if (this.config.selectedMarker === null) hidden = true;
+				if (this.zoomLevel === 0) hidden = true;
+				if (this.zoomLevel === 1 && this.config.selectionExists) hidden = true;
+				if (this.zoomLevel === 2 && this.config.regionSelectionExists) hidden = true;
+				if (this.zoomLevel === 3) hidden = true;
+				if (this.config.showPreview) hidden = true;
+				
+				if (!hidden) button.classList.remove("hide");
+				else  button.classList.add("hide");
+			}
+			// toggle move button on if we're moving a marker
+			if (this.config.markerMode === "move") {
+				document.getElementById("marker-move").classList.add("toggled");
+			} else {
+				document.getElementById("marker-move").classList.remove("toggled");
 			}
 		}
 		// cut
@@ -1052,6 +1069,7 @@ class MapMaker extends App{
 			if (this.zoomLevel === 2 && !this.config.regionSelectionExists) hidden = true;
 			if (this.zoomLevel === 3) hidden = true;
 			if (this.config.showPreview) hidden = true;
+			if (this.config.selectedMarker !== null) hidden = true;
 			if (!hidden) button.classList.remove("hide");
 			else  button.classList.add("hide");
 
@@ -1067,6 +1085,7 @@ class MapMaker extends App{
 			if (this.zoomLevel === 2 && !this.clipboard?.regions?.length) hidden = true;
 			if (this.zoomLevel === 3) hidden = true;
 			if (this.config.showPreview) hidden = true;
+			if (this.config.selectedMarker !== null) hidden = true;
 			if (this.annotate) hidden = true;
 			if (!hidden) button.classList.remove("hide");
 			else  button.classList.add("hide");
@@ -1078,6 +1097,7 @@ class MapMaker extends App{
 			// Hide
 			let hidden = false;
 			if (!this.config.showPreview) hidden = true;
+			if (this.config.selectedMarker !== null) hidden = true;
 			if (!hidden) button.classList.remove("hide");
 			else  button.classList.add("hide");
 
@@ -1088,6 +1108,7 @@ class MapMaker extends App{
 			// Hide
 			let hidden = false;
 			if (!this.config.showPreview) hidden = true;
+			if (this.config.selectedMarker !== null) hidden = true;
 			if (!hidden) button.classList.remove("hide");
 			else  button.classList.add("hide");
 
@@ -1098,6 +1119,7 @@ class MapMaker extends App{
 			// Hide
 			let hidden = false;
 			if (this.config.showPreview) hidden = true;
+			if (this.config.selectedMarker !== null) hidden = true;
 			if (!hidden) button.classList.remove("hide");
 			else  button.classList.add("hide");
 
@@ -1118,6 +1140,7 @@ class MapMaker extends App{
 		updateCancelPasteButton.call(this);
 		updateSizeButton.call(this);
 		updateEraseButton.call(this);
+		updateMarkerButton.call(this);
 		updateMarkerButtons.call(this);
 	}
 	update(){

@@ -49,7 +49,7 @@ const NOTE_TEMPLATES = [
 export default class Notes {
     constructor(mapMaker){
         this.mapMaker = mapMaker;
-        this.searchEngine = new SearchEngine(this.mapMaker.notes);
+        this.searchEngine = new SearchEngine(this.mapMaker);
         this.diceRoller = new DiceRoller();
         this.mapMaker.notes.templates ??= [];
         this.noteHistory = new Map();
@@ -423,19 +423,18 @@ export default class Notes {
             }
             clearTooltip();
         })
-
-
-
         this.generateCatagories();
-
-
-
     }
-    goto(key){
+    goto(key, textareaId = null, textareaOwnerKey = key){
         this.mapMaker.currentNoteKey = key;
         showElms(document.querySelector("#notes > main"), "section.area", "displayAreaNote");
         showElms(document.querySelector("#notes > main #mainNoteControls"), "button", "note-browse", "note-edit", "note-remove");
+        this.textareaOwnerKey = textareaOwnerKey;
         this.renderNote(this.mapMaker.notes[key]);
+        this.textareaOwnerKey = null;
+        if (textareaId) {
+            document.getElementById(textareaId)?.focus();
+        }
         // if this is a region or tile note, show the Go button
         const regex = /^(\d+)_(\d+)_(\d+)_(\d+)$/;
         const tileRegex = /^(\d+)_(\d+)$/;
@@ -444,6 +443,21 @@ export default class Notes {
             showElms(document.querySelector("#notes > main #mainNoteControls"), "button", "note-browse", "note-edit","note-goto");
         }
 
+    }
+
+    gotoMarker(marker) {
+        const markerNote = this.mapMaker.notes[marker.note];
+        const targetKey = markerNote?.goto;
+        if (!targetKey) {
+            this.goto(marker.note);
+            return;
+        }
+
+        const targetMarkers = this.mapMaker.markers.filter(candidate =>
+            this.mapMaker.notes[candidate.note]?.goto === targetKey
+        );
+        const targetIndex = targetMarkers.indexOf(marker);
+        this.goto(targetKey, `${targetKey}-${targetIndex + 1}`, marker.note);
     }
 
     editTemplate(index) {
@@ -620,8 +634,9 @@ export default class Notes {
         const textareas = container.querySelectorAll("textarea");
         if (!textareas.length) return;
 
-        note.textareas ??= {};
-
+        const noteKey = this.mapMaker.currentNoteKey || "note";
+        const storageNote = this.mapMaker.notes[this.textareaOwnerKey || noteKey] || note;
+        storageNote.textareas ??= {};
         textareas.forEach((textarea, index) => {
             textarea.classList.add("note-display-textarea");
             const listItem = textarea.closest("li");
@@ -633,8 +648,10 @@ export default class Notes {
                 }
             }
             textarea.rows = 1;
-            const key = textarea.id || textarea.name || `textarea-${index + 1}`;
-            const savedValue = note.textareas[key];
+            const legacyKey = textarea.id || textarea.name || `textarea-${index + 1}`;
+            const key = `${noteKey}-${index + 1}`;
+            textarea.id = key;
+            const savedValue = storageNote.textareas[key] ?? storageNote.textareas[legacyKey];
 
             if (savedValue !== undefined) {
                 textarea.value = savedValue;
@@ -649,11 +666,7 @@ export default class Notes {
             resizeTextarea();
             textarea.addEventListener("input", resizeTextarea);
             textarea.addEventListener("input", () => {
-                if (!this.mapMaker.notes[this.mapMaker.currentNoteKey]) return;
-
-                const currentNote = this.mapMaker.notes[this.mapMaker.currentNoteKey];
-                currentNote.textareas ??= {};
-                currentNote.textareas[key] = textarea.value;
+                storageNote.textareas[key] = textarea.value;
             });
 
             if (textarea.classList.contains("note-display-textarea-inline")) {
@@ -1915,7 +1928,7 @@ export default class Notes {
                 gotoButton.textContent = "Go to?";
                 gotoButton.style.gridArea = "goto-name";
                 gotoButton.addEventListener("click", () => {
-                    if (note.goto) this.goto(note.goto);
+                    if (note.goto) this.gotoMarker(marker);
                 });
                 markerFieldset.appendChild(gotoButton);
 
@@ -2104,6 +2117,7 @@ export default class Notes {
         createTemplatesSection.call(this);
         // show tile notes if we have any, otherwise show region notes
         if (Object.keys(this.mapMaker.notes).some(key => /^\d+_\d+_\d+_\d+$/.test(key))) {
+            return; // early returning this catagory for lag; will make toggleable when I add a settings menu 
             addHr(noteBrowser);
             getTileNotesSection.call(this);
         } 

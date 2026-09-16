@@ -1,6 +1,6 @@
 export default class SearchEngine {
-	constructor(notes) {
-		this.notes = notes;
+	constructor(mapMaker) {
+		this.mapMaker = mapMaker;
 		this.worker = new Worker(
 			new URL("./SearchWorker.js", import.meta.url),
 			{ type: "module" }
@@ -28,7 +28,7 @@ export default class SearchEngine {
 				type: "search",
 				id,
 				query,
-				notes: this.notes
+				notes: this.mapMaker.notes
 			});
 		});
 	}
