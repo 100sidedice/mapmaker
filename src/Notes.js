@@ -2129,10 +2129,8 @@ export default class Notes {
             addHr(noteBrowser);
             getGroupNotesSection.call(this);
         }
-        if (Object.keys(this.mapMaker.notes).some(key => /^marker_/.test(key))) {
-            addHr(noteBrowser);
-            getMarkerNotesSection.call(this);
-        }
+        addHr(noteBrowser);
+        getMarkerNotesSection.call(this);
         if (Object.keys(this.mapMaker.notes).some(key => /^scribble_/.test(key))) {
             addHr(noteBrowser);
             getAnnotatedNotesSection.call(this);
