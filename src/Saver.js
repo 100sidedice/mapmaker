@@ -121,6 +121,31 @@ export default class Saver {
 	}
 
 	/**
+	 * Converts custom tile images into data URLs for JSON export.
+	 * @param {Object<string, HTMLImageElement|HTMLCanvasElement>} images
+	 * @returns {Object<string, string>}
+	 */
+	serializeCustomImages(images) {
+		const result = {};
+
+		for (const [key, image] of Object.entries(images)) {
+			if (!key.startsWith("tile_")) continue;
+
+			const canvas = document.createElement("canvas");
+			canvas.width = image.naturalWidth || image.width;
+			canvas.height = image.naturalHeight || image.height;
+
+			if (!canvas.width || !canvas.height) continue;
+
+			const ctx = canvas.getContext("2d");
+			ctx.drawImage(image, 0, 0);
+			result[key] = canvas.toDataURL("image/png");
+		}
+
+		return result;
+	}
+
+	/**
 	 * Clears the current save.
 	 * @returns {Promise<void>}
 	 */

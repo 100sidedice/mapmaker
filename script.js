@@ -214,8 +214,12 @@ class MapMaker extends App{
 		for (const [key, src] of Object.entries(files)) {
 			this.images[key] = await this.loadImage(src);
 		}
+		for (const key of Object.keys(this.images)) {
+			if (key.startsWith("tile_")) delete this.images[key];
+		}
 		for (const [key, blob] of Object.entries(savedImages)) {
-			this.images[key] = await this.loadImage(URL.createObjectURL(blob));
+			const src = typeof blob === "string" ? blob : URL.createObjectURL(blob);
+			this.images[key] = await this.loadImage(src);
 		}
 	}
 
@@ -516,7 +520,8 @@ class MapMaker extends App{
 				config: this.config,
 				zoomLevel: this.zoomLevel,
 				annotations: this.annotations,
-				markers: this.markers
+				markers: this.markers,
+				images: this.saver.serializeCustomImages(this.images)
 			});
 
 			const blob = new Blob([json], { type: 'application/json' });
@@ -539,7 +544,7 @@ class MapMaker extends App{
 
 				const reader = new FileReader();
 
-				reader.onload = (e) => {
+				reader.onload = async (e) => {
 					const save = JSON.parse(e.target.result);
 
 					if (save.map) this.map = save.map;
@@ -551,6 +556,7 @@ class MapMaker extends App{
 					if (save.annotations) this.annotations = save.annotations;
 					if (save.markers) this.markers = save.markers;
 					else this.regionTypes = new Map();
+					await this.loadImages(save.images);
 					
 					// normalize old map formats
 					for (const key in this.map) {
@@ -565,6 +571,8 @@ class MapMaker extends App{
 					}
 					console.log("Loaded map:", this.map);
 					console.log("Loaded notes:", this.notes);
+					this.rebuildRegionTypes();
+					this.draw();
 				};
 
 				reader.readAsText(file);
