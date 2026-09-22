@@ -41,6 +41,11 @@ body {
     position: fixed;
     overscroll-behavior: none;
 }
+body.notes-fullscreen {
+    grid-template-columns: 0.31fr 0.68fr 0.31fr;
+    grid-template-rows: 1fr;
+    grid-template-areas: ". notes ."
+}
 html {
     height: var(--viewport-height, 100%);
     overscroll-behavior: none;

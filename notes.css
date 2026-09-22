@@ -82,6 +82,28 @@
     display: none;
 }
 
+fieldset.plain {
+    padding: 0.5rem 0;
+    margin: 0;
+    border: none;
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: scroll;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    flex-wrap: nowrap;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+}
+#noteInput::-webkit-scrollbar {
+    display: none;              /* Chrome, Safari, new Edge */
+}
+
 #noteInput {
     width: 100%;
     flex: 1;
@@ -96,6 +118,8 @@
     font-family: inherit;
     resize: vertical;
     line-height: 1.4;
+    overflow-x: scroll;
+    white-space: pre;
 }
 
 #noteInput:focus {
@@ -103,22 +127,7 @@
     border-color: #3d6b3d;
 }
 
-fieldset.plain {
-    padding: 0.5rem 0;
-    margin: 0;
-    border: none;
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-    overflow-x: scroll;
-    overflow-y: hidden;
-    flex-wrap: nowrap;
-    box-sizing: border-box;
-    flex: 0 0 auto;
-}
+
 hr {
     border: none;
     border-top: 0.1rem solid #664c2e;

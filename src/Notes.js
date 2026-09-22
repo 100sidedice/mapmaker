@@ -84,6 +84,32 @@ export default class Notes {
                 notes.style.height = "auto";
             }
         });
+        // if notes header is held for 1 second, full-screen the notes area
+        let notesHeaderHoldTimeout;
+        notesHeader.addEventListener("mousedown", () => {
+            notesHeaderHoldTimeout = setTimeout(() => {
+                document.body.classList.toggle("notes-fullscreen");
+                // if on, hide the toolbar & infomation button
+                if (document.body.classList.contains("notes-fullscreen")) {
+                    document.getElementById("toolbar").classList.add("hide");
+                    document.getElementById("tileContainer").classList.add("hide");
+                    document.getElementById("buttonContainer").classList.add("hide");
+                    document.getElementById("instructions").classList.add("hide");
+                    document.getElementById("close-instructions").classList.add("hide");
+                } else {
+                    document.getElementById("toolbar").classList.remove("hide");
+                    document.getElementById("tileContainer").classList.remove("hide");
+                    document.getElementById("buttonContainer").classList.remove("hide");
+                    document.getElementById("close-instructions").classList.remove("hide");
+                }
+            }, 1000);
+        });
+        notesHeader.addEventListener("mouseup", () => {
+            clearTimeout(notesHeaderHoldTimeout);
+        });
+        notesHeader.addEventListener("mouseleave", () => {
+            clearTimeout(notesHeaderHoldTimeout);
+        });
 
         if (window.matchMedia("(max-width: 600px)").matches) {
             document.getElementById("notesMain").classList.add("hidden");
