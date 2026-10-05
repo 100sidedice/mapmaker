@@ -2134,6 +2134,71 @@ export default class Notes {
             noteBrowser.appendChild(details);
         }
 
+        function createUploadSection(){
+            const uploadDetails = document.createElement("details");
+            if (openCatagories.includes("Upload")) {
+                uploadDetails.setAttribute("open", "");
+            }
+            uploadDetails.id = "Upload";
+            const uploadSummary = document.createElement("summary");
+            uploadSummary.textContent = "Upload";
+            addTooltip(uploadSummary, "Upload notes to a server and share the link with others");
+            uploadDetails.appendChild(uploadSummary);
+            const uploadFieldset = document.createElement("fieldset");
+            uploadFieldset.id = "note-browser-upload";
+            uploadFieldset.classList.add("one-column", "plain");
+
+            // upload id textarea
+            if (!this.mapMaker.notes["_upload"] || !this.mapMaker.notes["_upload"].id) {
+                const uploadIdTextarea = document.createElement("textarea");
+                uploadIdTextarea.id = "note-upload-id";
+                uploadIdTextarea.placeholder = "Username/ID...";
+                uploadIdTextarea.classList.add("note-title");
+    
+                // on blur, upload
+                uploadIdTextarea.addEventListener("blur", () => {
+                    let id = uploadIdTextarea.value.trim();
+                    // stop ARC (convert to string, concatenate _upload)
+                    id = "_upload".concat(String(id));
+    
+                    if (id) {
+                        this.upload(uploadIdTextarea,id)
+                    }
+                });
+                // enter blur
+                uploadIdTextarea.addEventListener("keydown", (event) => {
+                    if (event.key === "Enter") {
+                        event.preventDefault();
+                        uploadIdTextarea.blur();
+                    }
+                });
+                uploadFieldset.appendChild(uploadIdTextarea);
+            } else {
+                // remove upload button
+                const removeUploadButton = document.createElement("button");
+                removeUploadButton.id = "note-remove-upload";
+                removeUploadButton.textContent = "Remove Upload";
+                removeUploadButton.addEventListener("click", () => {
+                    this.removeUpload(removeUploadButton, this.mapMaker.notes["_upload"].id);
+                });
+                uploadFieldset.appendChild(removeUploadButton);
+
+
+                // copy upload url button
+                const copyUploadButton = document.createElement("button");
+                copyUploadButton.id = "note-copy-upload";
+                copyUploadButton.textContent = "Copy Upload URL";
+                copyUploadButton.addEventListener("click", () => {
+                    const uploadId = this.mapMaker.notes["_upload"].id;
+                    const uploadUrl = `${window.location.origin}${window.location.pathname}?upload=${encodeURIComponent(uploadId)}`;
+                    navigator.clipboard.writeText(uploadUrl);
+                });
+                uploadFieldset.appendChild(copyUploadButton);
+            }
+            uploadDetails.appendChild(uploadFieldset);
+            noteBrowser.appendChild(uploadDetails);
+        }
+
         createGlobalNotesSection.call(this);
         addHr(noteBrowser);
         createCharacterNotesSection.call(this);
@@ -2141,6 +2206,8 @@ export default class Notes {
         createKeywordsSection.call(this);
         addHr(noteBrowser);
         createTemplatesSection.call(this);
+        
+
         // show tile notes if we have any, otherwise show region notes
         if (Object.keys(this.mapMaker.notes).some(key => /^\d+_\d+_\d+_\d+$/.test(key))) {
             return; // early returning this catagory for lag; will make toggleable when I add a settings menu 
@@ -2161,6 +2228,37 @@ export default class Notes {
             addHr(noteBrowser);
             getAnnotatedNotesSection.call(this);
         }
+        addHr(noteBrowser);
+        createUploadSection.call(this);
+    }
+
+    async upload(element, id){
+        const txt = element.value.trim();
+                    element.value = "Uploading...";
+        
+        // we would upload here
+        // for now just save id we uploaded
+        this.mapMaker.notes["_upload"] = {
+            id: id
+        };
+
+        // set text back
+        element.value = txt;
+
+        // refresh
+        this.generateCatagories(...getOpenCatagories());
+    }
+    removeUpload(element, id){
+        // remove the upload id from notes
+        const txt = element.value.trim();
+                element.value = "Removing...";
+                
+        // remove uplaod
+                
+        delete this.mapMaker.notes["_upload"];
+        // set text back
+        element.value = txt;
+        this.generateCatagories(...getOpenCatagories());
     }
 }
 
