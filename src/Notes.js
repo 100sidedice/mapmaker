@@ -2,6 +2,7 @@ import { addTooltip, removeTooltip, clearTooltip } from "./Tooltip.js";
 import SearchEngine from "./SearchEngine.js";
 import DiceRoller from "./DiceRoller.js";
 import { attachNoteEditor, attachNoteTagButtons } from "./NoteEditor.js";
+import FirebaseData from "./firebase/firebase.js";
 
 const NOTE_TEMPLATES = [
     {
@@ -51,6 +52,7 @@ export default class Notes {
         this.mapMaker = mapMaker;
         this.searchEngine = new SearchEngine(this.mapMaker);
         this.diceRoller = new DiceRoller();
+        this.firebase = new FirebaseData();
         this.mapMaker.notes.templates ??= [];
         this.noteHistory = new Map();
         this.historyApplying = false;
@@ -2157,13 +2159,13 @@ export default class Notes {
     
                 // on blur, upload
                 uploadIdTextarea.addEventListener("blur", () => {
-                    let id = uploadIdTextarea.value.trim();
+                    const enteredId = uploadIdTextarea.value.trim();
+                    if (!enteredId) return;
+
                     // stop ARC (convert to string, concatenate _upload)
-                    id = "_upload".concat(String(id));
+                    const id = "_upload".concat(enteredId);
     
-                    if (id) {
-                        this.upload(uploadIdTextarea,id)
-                    }
+                    this.upload(uploadIdTextarea, id);
                 });
                 // enter blur
                 uploadIdTextarea.addEventListener("keydown", (event) => {
@@ -2232,33 +2234,36 @@ export default class Notes {
         createUploadSection.call(this);
     }
 
-    async upload(element, id){
+    async upload(element, id) {
         const txt = element.value.trim();
-                    element.value = "Uploading...";
-        
-        // we would upload here
-        // for now just save id we uploaded
-        this.mapMaker.notes["_upload"] = {
-            id: id
-        };
+        element.value = "Uploading...";
 
-        // set text back
-        element.value = txt;
+        try {
+            const notes = { ...this.mapMaker.notes };
+            delete notes._upload;
+            await this.firebase.upload(id, notes);
 
-        // refresh
-        this.generateCatagories(...getOpenCatagories());
+            this.mapMaker.notes["_upload"] = { id };
+            element.value = txt;
+            this.generateCatagories(...getOpenCatagories());
+        } catch (error) {
+            element.value = txt;
+            console.error(`Failed to upload notes to "${id}".`, error);
+        }
     }
-    removeUpload(element, id){
+    async removeUpload(element, id) {
         // remove the upload id from notes
-        const txt = element.value.trim();
-                element.value = "Removing...";
-                
-        // remove uplaod
-                
-        delete this.mapMaker.notes["_upload"];
-        // set text back
-        element.value = txt;
-        this.generateCatagories(...getOpenCatagories());
+        const originalText = element.textContent;
+        element.textContent = "Removing...";
+
+        try {
+            await this.firebase.remove(id);
+            delete this.mapMaker.notes["_upload"];
+            this.generateCatagories(...getOpenCatagories());
+        } catch (error) {
+            element.textContent = originalText;
+            console.error(`Failed to remove uploaded notes "${id}".`, error);
+        }
     }
 }
 
