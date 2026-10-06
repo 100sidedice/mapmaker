@@ -64,6 +64,7 @@ class MapMaker extends App{
 		this.markers = [];
 		this.regions = {};
 		this.lastPicked = null;
+		this.uploadMode = false;
 
 		this.saver = new Saver();
 		this.saver.saveHook = () => {

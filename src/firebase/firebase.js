@@ -20,14 +20,60 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const dataRoot = "dnd";
+const UPLOAD_FORMAT_VERSION = 1;
 
 function dataRef(id) {
     return ref(db, `${dataRoot}/${id}`);
 }
 
+function encodeUploadData(value) {
+    if (Array.isArray(value)) {
+        return value.map(encodeUploadData);
+    }
+
+    if (value && typeof value === "object") {
+        return Object.fromEntries(
+            Object.entries(value).map(([key, child]) => [
+                encodeURIComponent(key),
+                encodeUploadData(child)
+            ])
+        );
+    }
+
+    return value;
+}
+
+function decodeUploadData(value) {
+    if (Array.isArray(value)) {
+        return value.map(decodeUploadData);
+    }
+
+    if (value && typeof value === "object") {
+        return Object.fromEntries(
+            Object.entries(value).map(([key, child]) => [
+                decodeURIComponent(key),
+                decodeUploadData(child)
+            ])
+        );
+    }
+
+    return value;
+}
+
+function decodeStoredUpload(value) {
+    if (value?._mapmakerUploadFormat !== UPLOAD_FORMAT_VERSION) {
+        return value;
+    }
+
+    return decodeUploadData(value.data);
+}
+
 export default class LobbyManager {
     async upload(id, data) {
-        await set(dataRef(id), data);
+        await set(dataRef(id), {
+            _mapmakerUploadFormat: UPLOAD_FORMAT_VERSION,
+            data: encodeUploadData(data)
+        });
     }
 
     async remove(id) {
@@ -36,7 +82,9 @@ export default class LobbyManager {
 
     async load(id) {
         const snapshot = await get(dataRef(id));
-        return snapshot.exists() ? snapshot.val() : null;
+        if (!snapshot.exists()) return null;
+
+        return decodeStoredUpload(snapshot.val());
     }
 
     async print(id) {
@@ -46,6 +94,13 @@ export default class LobbyManager {
 
     async printAll() {
         const snapshot = await get(ref(db, dataRoot));
-        return snapshot.exists() ? snapshot.val() : {};
+        if (!snapshot.exists()) return {};
+
+        return Object.fromEntries(
+            Object.entries(snapshot.val()).map(([id, data]) => [
+                id,
+                decodeStoredUpload(data)
+            ])
+        );
     }
 }

@@ -2255,7 +2255,11 @@ export default class Notes {
             addHr(noteBrowser);
             createTemplatesSection.call(this);
         }
-        
+
+        if (!this.mapMaker.uploadMode) {
+            addHr(noteBrowser);
+            createUploadSection.call(this);
+        }
 
         // show tile notes if we have any, otherwise show region notes
         if (Object.keys(this.mapMaker.notes).some(key => /^\d+_\d+_\d+_\d+$/.test(key))) {
@@ -2278,20 +2282,6 @@ export default class Notes {
         if (Object.keys(this.mapMaker.notes).some(key => /^scribble_/.test(key))) {
             addHr(noteBrowser);
             getAnnotatedNotesSection.call(this);
-        }
-        if (!this.mapMaker.uploadMode) {
-            addHr(noteBrowser);
-            createUploadSection.call(this);
-
-            if (this.mapMaker.uploadMode) {
-                noteBrowser.querySelectorAll(".nav-add").forEach(button => {
-                    button.classList.add("hide");
-                    const separator = button.previousElementSibling;
-                    if (separator?.tagName === "HR") {
-                        separator.classList.add("hide");
-                    }
-                });
-            }
         }
     }
 
