@@ -199,7 +199,9 @@ section.area {
 	    background-color: #88550022;
 	}
 }
-
+.ignore {
+    display: none !important;
+}
 #noteDisplay fieldset {
     margin: 0.35rem 0;
     padding: 0.4rem 0.5rem;
