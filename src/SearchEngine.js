@@ -28,7 +28,8 @@ export default class SearchEngine {
 				type: "search",
 				id,
 				query,
-				notes: this.mapMaker.notes
+				notes: this.mapMaker.notes,
+				hideIgnored: true
 			});
 		});
 	}

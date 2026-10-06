@@ -1,6 +1,6 @@
 // web worker for searching notes, so that the UI doesn't freeze while searching
 self.onmessage = event => {
-	const { type, query, notes } = event.data;
+	const { type, query, notes, hideIgnored } = event.data;
 
 	if (type !== "search") return;
 
@@ -24,6 +24,7 @@ function searchNotes(notes, query) {
 
 	for (const [key, note] of Object.entries(notes)) {
 		if (!note?.text) continue;
+		if (hideIgnored && note.text.trimStart().startsWith("#ignore")) continue;
 
 		const text = note.text.toLowerCase();
 

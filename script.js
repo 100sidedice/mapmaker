@@ -172,7 +172,7 @@ class MapMaker extends App{
 		this.loadKeymap();
 		this.loadMouse(true);
 		this.loadButtons();
-		this.Notes.load();
+		await this.Notes.load();
 		this.rebuildRegionTypes();
 		this.PixelEngine.load(this);
 		this.TileEngine.load(this);

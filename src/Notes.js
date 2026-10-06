@@ -58,7 +58,25 @@ export default class Notes {
         this.historyApplying = false;
     }
 
-    load(){
+    async load(){
+        const uploadId = new URLSearchParams(window.location.search).get("upload");
+        if (uploadId) {
+            try {
+                const uploadedNotes = await this.firebase.load(uploadId);
+                if (!uploadedNotes || typeof uploadedNotes !== "object" || Array.isArray(uploadedNotes)) {
+                    throw new Error(`No notes were found for upload "${uploadId}".`);
+                }
+                this.mapMaker.notes = uploadedNotes;
+                this.mapMaker.notes.keywords ??= [];
+                this.mapMaker.notes.templates ??= [];
+                this.mapMaker.uploadMode = true;
+            } catch (error) {
+                console.error(`Failed to load uploaded notes from "${uploadId}".`, error);
+                const message = error instanceof Error ? error.message : String(error);
+                alert(`Failed to load uploaded notes from "${uploadId}".\n\n${message}`);
+            }
+        }
+
         this.loadNoteButtons();
         // start with the note browser open
         showElms(document.querySelector("#notes > main"), "section.area", "noteBrowser");
@@ -116,6 +134,19 @@ export default class Notes {
         if (window.matchMedia("(max-width: 600px)").matches) {
             document.getElementById("notesMain").classList.add("hidden");
         }
+
+        if (this.mapMaker.uploadMode) {
+            document.body.classList.add("notes-fullscreen");
+            document.body.dataset.uploadMode = "true";
+            document.getElementById("mapCanvas").classList.add("hide");
+            document.getElementById("toolbar").classList.add("hide");
+            document.getElementById("tileContainer").classList.add("hide");
+            document.getElementById("buttonContainer").classList.add("hide");
+            document.getElementById("instructions").classList.add("hide");
+            document.getElementById("close-instructions").classList.add("hide");
+            document.getElementById("notesMain").classList.remove("hidden");
+            document.getElementById("notes").style.height = "auto";
+        }
     }
     saveCurrentNote() {
         const input = document.getElementById("noteInput");
@@ -156,6 +187,9 @@ export default class Notes {
         } else {
             this.mapMaker.notes[this.mapMaker.currentNoteKey].text = text;
         }
+    }
+    isIgnoredNote(note) {
+        return typeof note?.text === "string" && note.text.trimStart().startsWith("#ignore");
     }
     getNoteHistoryKey() {
         if (Number.isInteger(this.editingTemplateIndex)) {
@@ -568,7 +602,8 @@ export default class Notes {
         this.resetNoteHistory(note.text);
 
         const noteText = document.createElement("p");
-        noteText.innerHTML = this.expandNoteVariables(note.text);
+        const formattedText = note.text.replace(/^\s*#ignore\b[^\r\n]*(?:\r?\n|$)/i, "");
+        noteText.innerHTML = this.expandNoteVariables(formattedText);
         displayArea.appendChild(noteText);
 
         const localValues = this.parseValueTags(noteText);
@@ -1201,6 +1236,7 @@ export default class Notes {
                 if (key.startsWith("character_")) {
                     count++;
                     const note = this.mapMaker.notes[key];
+                    if (this.isIgnoredNote(note)) continue;
                     const button = document.createElement("button");
                     button.classList.add("nav-note");
                     button.textContent = key.replace("character_", "");
@@ -1297,6 +1333,7 @@ export default class Notes {
                 if (key.startsWith("global_")) {
                     count++;
                     const note = this.mapMaker.notes[key];
+                    if (this.isIgnoredNote(note)) continue;
                     const button = document.createElement("button");
                     button.classList.add("nav-note");
                     button.textContent = key.replace("global_", "");
@@ -1773,6 +1810,7 @@ export default class Notes {
             for (const key in this.mapMaker.notes) {
                 if (/^\d+_\d+_\d+_\d+$/.test(key)) {
                     const note = this.mapMaker.notes[key];
+                    if (this.isIgnoredNote(note)) continue;
                     const button = document.createElement("button");
                     button.classList.add("nav-note");
                     button.textContent = key;
@@ -1823,6 +1861,7 @@ export default class Notes {
             for (const key in this.mapMaker.notes) {
                 if (/^\d+_\d+$/.test(key)) {
                     const note = this.mapMaker.notes[key];
+                    if (this.isIgnoredNote(note)) continue;
                     const button = document.createElement("button");
                     button.classList.add("nav-note");
                     button.textContent = key;
@@ -1872,6 +1911,7 @@ export default class Notes {
                     text: "Marker",
                     color: marker.color || "#ffff00cc"
                 };
+                if (this.isIgnoredNote(note)) continue;
                 const createMarkerPreview = () => {
                     const canvas = document.createElement("canvas");
                     canvas.width = 48;
@@ -2022,6 +2062,7 @@ export default class Notes {
             for (const key in this.mapMaker.notes) {
                 if (/^group_/.test(key)) {
                     const note = this.mapMaker.notes[key];
+                    if (this.isIgnoredNote(note)) continue;
                     const button = document.createElement("button");
                     button.classList.add("nav-note");
                     button.textContent = key.replace("group_", "");
@@ -2204,10 +2245,12 @@ export default class Notes {
         createGlobalNotesSection.call(this);
         addHr(noteBrowser);
         createCharacterNotesSection.call(this);
-        addHr(noteBrowser);
-        createKeywordsSection.call(this);
-        addHr(noteBrowser);
-        createTemplatesSection.call(this);
+        if (!this.mapMaker.uploadMode) {
+            addHr(noteBrowser);
+            createKeywordsSection.call(this);
+            addHr(noteBrowser);
+            createTemplatesSection.call(this);
+        }
         
 
         // show tile notes if we have any, otherwise show region notes
@@ -2224,14 +2267,18 @@ export default class Notes {
             addHr(noteBrowser);
             getGroupNotesSection.call(this);
         }
-        addHr(noteBrowser);
-        getMarkerNotesSection.call(this);
+        if (!this.mapMaker.uploadMode) {
+            addHr(noteBrowser);
+            getMarkerNotesSection.call(this);
+        }
         if (Object.keys(this.mapMaker.notes).some(key => /^scribble_/.test(key))) {
             addHr(noteBrowser);
             getAnnotatedNotesSection.call(this);
         }
-        addHr(noteBrowser);
-        createUploadSection.call(this);
+        if (!this.mapMaker.uploadMode) {
+            addHr(noteBrowser);
+            createUploadSection.call(this);
+        }
     }
 
     async upload(element, id) {
@@ -2249,6 +2296,8 @@ export default class Notes {
         } catch (error) {
             element.value = txt;
             console.error(`Failed to upload notes to "${id}".`, error);
+            const message = error instanceof Error ? error.message : String(error);
+            alert(`Failed to upload notes to "${id}".\n\n${message}`);
         }
     }
     async removeUpload(element, id) {
@@ -2263,6 +2312,8 @@ export default class Notes {
         } catch (error) {
             element.textContent = originalText;
             console.error(`Failed to remove uploaded notes "${id}".`, error);
+            const message = error instanceof Error ? error.message : String(error);
+            alert(`Failed to remove uploaded notes "${id}".\n\n${message}`);
         }
     }
 }
@@ -2287,6 +2338,11 @@ function showElms(container,cssSelector,...ids){
             element.classList.remove('hide');
         }
     });
+    if (document.body.dataset.uploadMode === "true") {
+        ["note-edit", "note-remove", "note-goto"].forEach(id => {
+            container.querySelector(`#${id}`)?.classList.add("hide");
+        });
+    }
 }
 function getOpenCatagories(){
     const openCatagories = [];
