@@ -386,4 +386,9 @@ span {
         top: 0;
         height: var(--viewport-height, 100dvh);
     }
+    body.notes-fullscreen {
+        grid-template-columns: 0fr 0.68fr 0fr;
+        grid-template-rows: 1fr;
+        grid-template-areas: ". notes ."
+    }
 }

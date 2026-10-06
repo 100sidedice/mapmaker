@@ -527,6 +527,35 @@ nav {
         min-height: 0;
     }
 
+    body.notes-fullscreen {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr;
+        grid-template-areas: "notes";
+    }
+
+    body.notes-fullscreen #notes {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: var(--viewport-height, 100dvh) !important;
+        margin: 0;
+        border: none;
+        overflow: hidden;
+    }
+
+    body.notes-fullscreen #notes header {
+        flex: 0 0 3.5rem;
+    }
+
+    body.notes-fullscreen #notes main:not(.hidden) {
+        position: static;
+        flex: 1 1 auto;
+        width: 100%;
+        height: auto;
+        min-height: 0;
+        overflow: auto;
+    }
+
     #notes header:hover,
     #notes header:active {
         padding: 0.5rem 1rem;
