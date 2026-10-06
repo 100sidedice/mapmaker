@@ -104,9 +104,45 @@ fieldset.plain {
     display: none;              /* Chrome, Safari, new Edge */
 }
 
+.note-editor-shell {
+    display: flex;
+    flex: 1;
+    min-height: 8rem;
+    min-width: 0;
+}
+
+.note-editor-gutter {
+    flex: 0 0 1.8rem;
+    overflow: hidden;
+    padding-top: 0.6rem;
+    background: #e4d2b7;
+    border: 0.15rem solid #664c2e;
+    border-right: none;
+    border-radius: 0.25rem 0 0 0.25rem;
+    box-sizing: border-box;
+}
+
+.note-editor-gutter-row {
+    height: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.note-fold-button {
+    flex: 0 0 auto !important;
+    width: 1.4rem;
+    min-height: 1.2rem;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
 #noteInput {
     width: 100%;
-    flex: 1;
+    flex: 1 1 auto;
     min-height: 8rem;
     padding: 0.6rem;
     box-sizing: border-box;
@@ -120,6 +156,10 @@ fieldset.plain {
     line-height: 1.4;
     overflow-x: scroll;
     white-space: pre;
+}
+
+#noteInput.note-input-folded {
+    background-repeat: no-repeat;
 }
 
 #noteInput:focus {
@@ -199,7 +239,7 @@ section.area {
 	    background-color: #88550022;
 	}
 }
-.ignore {
+body[data-upload-mode="true"] .ignore {
     display: none !important;
 }
 #noteDisplay fieldset {

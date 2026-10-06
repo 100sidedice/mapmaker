@@ -1,7 +1,12 @@
 import { addTooltip, removeTooltip, clearTooltip } from "./Tooltip.js";
 import SearchEngine from "./SearchEngine.js";
 import DiceRoller from "./DiceRoller.js";
-import { attachNoteEditor, attachNoteTagButtons } from "./NoteEditor.js";
+import {
+    attachNoteEditor,
+    attachNoteTagButtons,
+    getNoteEditorValue,
+    refreshNoteEditor
+} from "./NoteEditor.js";
 import FirebaseData from "./firebase/firebase.js";
 
 const NOTE_TEMPLATES = [
@@ -161,7 +166,7 @@ export default class Notes {
 
         if (!this.mapMaker.currentNoteKey) return;
 
-        const text = input.value.trim();
+        const text = getNoteEditorValue(input).trim();
         const variableRegex = /<var\s+key=["']([^"']+)["']>([\s\S]*?)<\/var>/gi;
         let match;
 
@@ -245,6 +250,7 @@ export default class Notes {
         const input = document.getElementById("noteInput");
         this.historyApplying = true;
         input.value = history.undo.at(-1);
+        refreshNoteEditor(input);
         this.saveCurrentNote();
         this.historyApplying = false;
         input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -260,7 +266,7 @@ export default class Notes {
         noteInput.parentNode.appendChild(hr);
         attachNoteTagButtons(noteInput, document.getElementById("note-tag-controls"));
         noteInput.addEventListener("input", () => {
-            this.recordNoteHistory(noteInput.value);
+            this.recordNoteHistory(getNoteEditorValue(noteInput));
             this.saveCurrentNote();
         });
         noteInput.addEventListener("keydown", event => {
@@ -530,6 +536,7 @@ export default class Notes {
 
         this.editingTemplateIndex = index;
         document.getElementById("noteInput").value = template.html;
+        refreshNoteEditor(document.getElementById("noteInput"));
         this.resetNoteHistory(template.html);
         showElms(document.querySelector("#notes > main"), "section.area", "noteEdit");
         showElms(
@@ -595,12 +602,14 @@ export default class Notes {
 
         const noteInput = document.getElementById("noteInput");
         noteInput.value = "";
+        refreshNoteEditor(noteInput);
 
         this.resetNoteHistory("");
 
         if (!note) return;
 
         noteInput.value = note.text;
+        refreshNoteEditor(noteInput);
         this.resetNoteHistory(note.text);
 
         const noteText = document.createElement("p");

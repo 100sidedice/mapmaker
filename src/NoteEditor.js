@@ -27,6 +27,8 @@ const TAGS = [
  * @param {HTMLTextAreaElement} textarea
  */
 export function attachNoteEditor(textarea) {
+    const folding = createFoldingEditor(textarea);
+
     textarea.addEventListener("keydown", event => {
         if (event.key === "Tab") {
             event.preventDefault();
@@ -55,9 +57,352 @@ export function attachNoteEditor(textarea) {
     });
 
     textarea.addEventListener("input", event => {
+        folding.clear();
         if (event.data !== ">") return;
         closeHtmlTag(textarea);
     });
+    textarea.addEventListener("copy", event => {
+        const value = folding.getSelectedValue();
+        if (value === null) return;
+
+        event.preventDefault();
+        event.clipboardData.setData("text/plain", value);
+    });
+
+    folding.refresh();
+}
+
+/**
+ * Refreshes the fold gutter after code is loaded into the textarea.
+ * @param {HTMLTextAreaElement} textarea
+ */
+export function refreshNoteEditor(textarea) {
+    textarea.noteEditorFolding?.refresh();
+}
+
+/**
+ * Returns the complete editor content, excluding any visual folding.
+ * @param {HTMLTextAreaElement} textarea
+ * @returns {string}
+ */
+export function getNoteEditorValue(textarea) {
+    return textarea.noteEditorFolding?.getValue() ?? textarea.value;
+}
+
+function createFoldingEditor(textarea) {
+    const existing = textarea.noteEditorFolding;
+    if (existing) return existing;
+
+    const shell = document.createElement("div");
+    shell.className = "note-editor-shell";
+    const gutter = document.createElement("div");
+    gutter.className = "note-editor-gutter";
+    textarea.parentNode.insertBefore(shell, textarea);
+    shell.append(gutter, textarea);
+
+    const state = {
+        original: null,
+        displayValue: null,
+        folds: [],
+        refresh() {
+            state.original = null;
+            state.displayValue = null;
+            state.folds = [];
+            textarea.disabled = false;
+            clearFoldedLineStyle();
+            renderFoldGutter();
+        },
+        clear() {
+            if (state.original !== null) {
+                expandForEdit();
+                renderFoldGutter();
+                return;
+            }
+            renderFoldGutter();
+        },
+        isFolded() {
+            return state.original !== null;
+        },
+        getValue() {
+            return state.original ?? textarea.value;
+        },
+        getSelectedValue() {
+            if (state.original === null || textarea.selectionStart === textarea.selectionEnd) {
+                return null;
+            }
+
+            return getSourceSelection(
+                textarea.selectionStart,
+                textarea.selectionEnd,
+                state.original,
+                state.folds
+            );
+        }
+    };
+    textarea.noteEditorFolding = state;
+
+    textarea.addEventListener("scroll", () => {
+        gutter.scrollTop = textarea.scrollTop;
+    });
+
+    function renderFoldGutter() {
+        const lines = state.original ? state.original.split("\n") : textarea.value.split("\n");
+        const ranges = findFoldRanges(state.original || textarea.value);
+        const hiddenLines = new Set();
+        for (const fold of state.folds) {
+            for (let line = fold.startLine + 1; line <= fold.endLine; line++) {
+                hiddenLines.add(line);
+            }
+        }
+        updateFoldedLineStyle();
+        gutter.replaceChildren();
+        for (let index = 0; index < lines.length; index++) {
+            if (hiddenLines.has(index)) continue;
+            const row = document.createElement("div");
+            row.className = "note-editor-gutter-row";
+            const range = ranges.find(candidate =>
+                candidate.startLine === index &&
+                !state.folds.some(fold =>
+                    fold.startLine < index && index <= fold.endLine
+                )
+            );
+            if (range) {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "note-fold-button";
+                const folded = state.folds.some(fold => fold.start === range.start);
+                button.textContent = folded ? "▸" : "▾";
+                button.setAttribute(
+                    "aria-label",
+                    `${folded ? "Expand" : "Collapse"} ${range.tag} section`
+                );
+                button.addEventListener("click", () => {
+                    if (folded) {
+                        expand(range);
+                    } else {
+                        collapse(range);
+                    }
+                });
+                row.appendChild(button);
+            }
+            gutter.appendChild(row);
+        }
+    }
+
+    function collapse(range) {
+        if (state.original === null) state.original = textarea.value;
+        if (state.folds.some(fold => fold.start === range.start)) return;
+        state.folds.push(range);
+        state.folds.sort((left, right) => left.start - right.start);
+        textarea.value = getFoldedValue();
+        state.displayValue = textarea.value;
+        renderFoldGutter();
+    }
+
+    function expand(range) {
+        state.folds = state.folds.filter(fold => fold.start !== range.start);
+        if (!state.folds.length) {
+            textarea.value = state.original;
+            state.original = null;
+            state.displayValue = null;
+            textarea.disabled = false;
+        } else {
+            textarea.value = getFoldedValue();
+            state.displayValue = textarea.value;
+        }
+        renderFoldGutter();
+    }
+
+    function getFoldedValue() {
+        const lines = state.original.split("\n");
+        const hiddenLines = new Set();
+        for (const fold of state.folds) {
+            for (let line = fold.startLine + 1; line <= fold.endLine; line++) {
+                hiddenLines.add(line);
+            }
+        }
+        return lines
+            .map((line, lineNumber) => {
+                if (hiddenLines.has(lineNumber)) return null;
+                const fold = state.folds.find(candidate => candidate.startLine === lineNumber);
+                if (!fold) return line;
+                return line.replace(/^(\s*)<([A-Za-z][\w:-]*)/, "$1<...$2");
+            })
+            .filter(line => line !== null)
+            .join("\n");
+    }
+
+    function updateFoldedLineStyle() {
+        if (!state.original || !state.folds.length) {
+            clearFoldedLineStyle();
+            return;
+        }
+
+        const positions = state.folds.map(fold => {
+            let visibleLine = 0;
+            for (let line = 0; line < fold.startLine; line++) {
+                if (!state.folds.some(candidate =>
+                    candidate.startLine < line && line <= candidate.endLine
+                )) {
+                    visibleLine++;
+                }
+            }
+            return `0 ${0.6 + visibleLine * 1.4}rem`;
+        });
+        textarea.classList.add("note-input-folded");
+        textarea.style.backgroundImage = positions
+            .map(() => "linear-gradient(to bottom, rgba(80, 60, 35, 0.1), rgba(80, 60, 35, 0.1))")
+            .join(", ");
+        textarea.style.backgroundPosition = positions.join(", ");
+        textarea.style.backgroundSize = positions.map(() => "100% 1.4rem").join(", ");
+    }
+
+    function clearFoldedLineStyle() {
+        textarea.classList.remove("note-input-folded");
+        textarea.style.backgroundImage = "";
+        textarea.style.backgroundPosition = "";
+        textarea.style.backgroundSize = "";
+    }
+
+    function expandForEdit() {
+        const previous = state.displayValue;
+        const current = textarea.value;
+        const original = state.original;
+        let prefix = 0;
+        while (prefix < previous.length && prefix < current.length &&
+            previous[prefix] === current[prefix]) {
+            prefix++;
+        }
+
+        let oldSuffix = previous.length;
+        let newSuffix = current.length;
+        while (oldSuffix > prefix && newSuffix > prefix &&
+            previous[oldSuffix - 1] === current[newSuffix - 1]) {
+            oldSuffix--;
+            newSuffix--;
+        }
+
+        const mapPosition = position => {
+            let visiblePosition = 0;
+            let originalPosition = 0;
+            const lines = original.split("\n");
+            for (let line = 0; line < lines.length; line++) {
+                const hidden = state.folds.some(fold =>
+                    fold.startLine < line && line <= fold.endLine
+                );
+                if (hidden) {
+                    originalPosition += lines[line].length + 1;
+                    continue;
+                }
+                const fold = state.folds.find(candidate => candidate.startLine === line);
+                const visibleLine = fold
+                    ? lines[line].replace(/^(\s*)<([A-Za-z][\w:-]*)/, "$1<...$2")
+                    : lines[line];
+                if (position <= visiblePosition + visibleLine.length) {
+                    const lineOffset = position - visiblePosition;
+                    const placeholderOffset = fold && lineOffset > lines[line].indexOf("<") + 1
+                        ? 3
+                        : 0;
+                    return originalPosition + Math.min(
+                        lines[line].length,
+                        Math.max(0, lineOffset - placeholderOffset)
+                    );
+                }
+                visiblePosition += visibleLine.length + 1;
+                originalPosition += lines[line].length + 1;
+            }
+            return original.length;
+        };
+        const editStart = mapPosition(prefix);
+        const editEnd = mapPosition(oldSuffix);
+        const value = original.slice(0, editStart) +
+            current.slice(prefix, newSuffix) +
+            original.slice(editEnd);
+
+        const foldedTags = state.folds.map(fold => fold.tag);
+        state.original = value;
+        state.folds = findFoldRanges(value).filter(range => {
+            const tagIndex = foldedTags.indexOf(range.tag);
+            if (tagIndex === -1) return false;
+            foldedTags.splice(tagIndex, 1);
+            return true;
+        });
+        textarea.value = getFoldedValue();
+        state.displayValue = textarea.value;
+    }
+
+    function getSourceSelection(start, end, original, folds) {
+        const sourceStart = getSourcePosition(start, false, original, folds);
+        const sourceEnd = getSourcePosition(end, true, original, folds);
+        return original.slice(sourceStart, sourceEnd);
+    }
+
+    function getSourcePosition(position, endBias, original, folds) {
+        let visiblePosition = 0;
+        let sourcePosition = 0;
+        const lines = original.split("\n");
+
+        for (let line = 0; line < lines.length; line++) {
+            const hidden = folds.some(fold =>
+                fold.startLine < line && line <= fold.endLine
+            );
+            if (hidden) {
+                sourcePosition += lines[line].length + 1;
+                continue;
+            }
+
+            const fold = folds.find(candidate => candidate.startLine === line);
+            const visibleLine = fold
+                ? lines[line].replace(/^(\s*)<([A-Za-z][\w:-]*)/, "$1<...$2")
+                : lines[line];
+            const lineEnd = visiblePosition + visibleLine.length;
+
+            if (position <= lineEnd) {
+                if (fold && position > visiblePosition) {
+                    if (endBias) {
+                        const closingEnd = original.indexOf("\n", fold.end);
+                        return closingEnd === -1 ? original.length : closingEnd;
+                    }
+                    return sourcePosition;
+                }
+                return sourcePosition + Math.max(0, position - visiblePosition);
+            }
+
+            visiblePosition = lineEnd + 1;
+            sourcePosition += lines[line].length + 1;
+        }
+
+        return original.length;
+    }
+
+    return state;
+}
+
+function findFoldRanges(text) {
+    const ranges = [];
+    const stack = [];
+    const tagPattern = /<\/?([A-Za-z][\w:-]*)(?:\s[^<>]*)?>/g;
+    let match;
+    while ((match = tagPattern.exec(text))) {
+        const fullTag = match[0];
+        const tag = match[1].toLowerCase();
+        if (VOID_ELEMENTS.has(tag) || fullTag.endsWith("/>")) continue;
+        const line = text.slice(0, match.index).split("\n").length - 1;
+        if (fullTag.startsWith("</")) {
+            const opening = stack.pop();
+            if (!opening || opening.tag !== tag || opening.line === line) continue;
+            ranges.push({
+                start: opening.index,
+                end: match.index,
+                startLine: opening.line,
+                endLine: line,
+                tag
+            });
+        } else {
+            stack.push({ tag, index: match.index, line });
+        }
+    }
+    return ranges.filter(range => range.endLine > range.startLine);
 }
 
 /**
