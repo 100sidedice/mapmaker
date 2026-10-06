@@ -4,7 +4,7 @@ self.onmessage = event => {
 
 	if (type !== "search") return;
 
-	const results = searchNotes(notes, query);
+	const results = searchNotes(notes, query, hideIgnored);
 	self.postMessage({
         type: "results",
         id: event.data.id,
@@ -18,7 +18,7 @@ self.onmessage = event => {
  * @param {string} query - Search query.
  * @returns {Array} Matching notes.
  */
-function searchNotes(notes, query) {
+function searchNotes(notes, query, hideIgnored) {
 	const results = [];
 	const search = query.toLowerCase();
 

@@ -29,7 +29,7 @@ export default class SearchEngine {
 				id,
 				query,
 				notes: this.mapMaker.notes,
-				hideIgnored: true
+				hideIgnored: this.mapMaker.uploadMode
 			});
 		});
 	}

@@ -189,7 +189,9 @@ export default class Notes {
         }
     }
     isIgnoredNote(note) {
-        return typeof note?.text === "string" && note.text.trimStart().startsWith("#ignore");
+        return this.mapMaker.uploadMode &&
+            typeof note?.text === "string" &&
+            note.text.trimStart().startsWith("#ignore");
     }
     getNoteHistoryKey() {
         if (Number.isInteger(this.editingTemplateIndex)) {
@@ -602,7 +604,9 @@ export default class Notes {
         this.resetNoteHistory(note.text);
 
         const noteText = document.createElement("p");
-        const formattedText = note.text.replace(/^\s*#ignore\b[^\r\n]*(?:\r?\n|$)/i, "");
+        const formattedText = this.mapMaker.uploadMode
+            ? note.text.replace(/^\s*#ignore\b[^\r\n]*(?:\r?\n|$)/i, "")
+            : note.text;
         noteText.innerHTML = this.expandNoteVariables(formattedText);
         displayArea.appendChild(noteText);
 
@@ -2278,6 +2282,16 @@ export default class Notes {
         if (!this.mapMaker.uploadMode) {
             addHr(noteBrowser);
             createUploadSection.call(this);
+
+            if (this.mapMaker.uploadMode) {
+                noteBrowser.querySelectorAll(".nav-add").forEach(button => {
+                    button.classList.add("hide");
+                    const separator = button.previousElementSibling;
+                    if (separator?.tagName === "HR") {
+                        separator.classList.add("hide");
+                    }
+                });
+            }
         }
     }
 
