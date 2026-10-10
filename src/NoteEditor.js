@@ -238,7 +238,12 @@ function createFoldingEditor(textarea) {
             return;
         }
 
-        const positions = state.folds.map(fold => {
+        const visibleFolds = state.folds.filter(fold => !state.folds.some(candidate =>
+            candidate !== fold &&
+            candidate.startLine < fold.startLine &&
+            fold.endLine <= candidate.endLine
+        ));
+        const positions = visibleFolds.map(fold => {
             let visibleLine = 0;
             for (let line = 0; line < fold.startLine; line++) {
                 if (!state.folds.some(candidate =>

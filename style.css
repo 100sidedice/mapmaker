@@ -47,6 +47,13 @@ body.notes-fullscreen {
     grid-template-rows: 1fr;
     grid-template-areas: ". notes ."
 }
+@media (min-width: 601px) {
+    body.notes-fullscreen:has(#noteEdit:not(.hide)) {
+        grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
+        grid-template-rows: 1fr;
+        grid-template-areas: ". notes notes notes note-tags .";
+    }
+}
 html {
     height: var(--viewport-height, 100%);
     overscroll-behavior: none;
