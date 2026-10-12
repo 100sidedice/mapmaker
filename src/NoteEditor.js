@@ -97,8 +97,10 @@ function createFoldingEditor(textarea) {
     shell.className = "note-editor-shell";
     const gutter = document.createElement("div");
     gutter.className = "note-editor-gutter";
+    const highlight = document.createElement("pre");
+    highlight.className = "note-editor-highlight";
     textarea.parentNode.insertBefore(shell, textarea);
-    shell.append(gutter, textarea);
+    shell.append(gutter, highlight, textarea);
 
     const state = {
         original: null,
@@ -143,6 +145,7 @@ function createFoldingEditor(textarea) {
 
     textarea.addEventListener("scroll", () => {
         gutter.scrollTop = textarea.scrollTop;
+        highlight.style.transform = `translate(${-textarea.scrollLeft}px, ${-textarea.scrollTop}px)`;
     });
 
     function renderFoldGutter() {
@@ -155,6 +158,7 @@ function createFoldingEditor(textarea) {
             }
         }
         updateFoldedLineStyle();
+        updateSyntaxHighlight();
         gutter.replaceChildren();
         for (let index = 0; index < lines.length; index++) {
             if (hiddenLines.has(index)) continue;
@@ -267,6 +271,10 @@ function createFoldingEditor(textarea) {
         textarea.style.backgroundImage = "";
         textarea.style.backgroundPosition = "";
         textarea.style.backgroundSize = "";
+    }
+
+    function updateSyntaxHighlight() {
+        highlight.innerHTML = highlightNoteText(textarea.value);
     }
 
     function expandForEdit() {
@@ -406,8 +414,96 @@ function findFoldRanges(text) {
         } else {
             stack.push({ tag, index: match.index, line });
         }
+
     }
     return ranges.filter(range => range.endLine > range.startLine);
+}
+
+function highlightNoteText(text) {
+    return text.split("\n").map(highlightNoteLine).join("\n") + "\n";
+}
+
+function highlightNoteLine(line) {
+    const indentation = line.match(/^ */)[0];
+    const content = line.slice(indentation.length);
+    const indentGroups = Math.floor(indentation.length / 4);
+    let result = "";
+
+    for (let index = 0; index < indentGroups; index++) {
+        const group = indentation.slice(index * 4, index * 4 + 4);
+        result += `<span class="note-editor-indent">${group}</span>`;
+    }
+
+    result += escapeHtml(indentation.slice(indentGroups * 4));
+    return result + highlightNoteSyntax(content);
+}
+
+function highlightNoteSyntax(text) {
+    const tokenPattern = /<[^<>\n]*>|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\[[^\]\n]*\]/g;
+    let result = "";
+    let position = 0;
+    let match;
+
+    while ((match = tokenPattern.exec(text))) {
+        result += escapeHtml(text.slice(position, match.index));
+        const token = match[0];
+        if (token[0] === "<") {
+            result += highlightTag(token);
+        } else if (token[0] === "[") {
+            result += highlightSpan("note-syntax-dice", token);
+        } else {
+            result += highlightSpan("note-syntax-string", token);
+        }
+        position = match.index + token.length;
+    }
+
+    return result + escapeHtml(text.slice(position));
+}
+
+function highlightTag(tag) {
+    const match = tag.match(/^(\s*)(<\/?)([A-Za-z][\w:-]*)([\s\S]*?)(\/?>)$/);
+    if (!match) return highlightSpan("note-syntax-arrow", tag);
+
+    const [, whitespace, opening, name, metadata, closing] = match;
+    return escapeHtml(whitespace) +
+        highlightSpan("note-syntax-arrow", opening) +
+        highlightSpan("note-syntax-tag", name) +
+        highlightTagMetadata(metadata) +
+        highlightSpan("note-syntax-arrow", closing);
+}
+
+function highlightTagMetadata(metadata) {
+    let result = "";
+    let position = 0;
+    const tokenPattern = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[A-Za-z_:][\w:.-]*/g;
+    let match;
+
+    while ((match = tokenPattern.exec(metadata))) {
+        result += escapeHtml(metadata.slice(position, match.index));
+        result += highlightSpan(
+            match[0][0] === "\"" || match[0][0] === "'"
+                ? "note-syntax-string"
+                : "note-syntax-metadata",
+            match[0]
+        );
+        position = match.index + match[0].length;
+    }
+
+    return result + escapeHtml(metadata.slice(position));
+}
+
+function highlightSpan(className, text) {
+    return `<span class="${className}">${escapeHtml(text)}</span>`;
+}
+
+function escapeHtml(text) {
+    return text.replace(/[&<>"']/g, character => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;"
+    }[character]));
 }
 
 /**

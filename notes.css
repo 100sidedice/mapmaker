@@ -1,3 +1,13 @@
+:root {
+    --note-editor-text: #332416;
+    --note-editor-tag: #174a70;
+    --note-editor-arrow: #4a4a4a;
+    --note-editor-string: #a85d18;
+    --note-editor-metadata: #477b9c;
+    --note-editor-dice: #704b91;
+    --note-editor-indent: #b7a17f;
+}
+
 #notes {
     grid-area: notes;
     position: sticky;
@@ -112,15 +122,39 @@ fieldset.plain {
 }
 
 .note-editor-shell {
+    position: relative;
     display: flex;
     flex: 1;
     min-height: 8rem;
     min-width: 0;
+    overflow: hidden;
+    background: #f3e6cf;
+}
+
+.note-editor-highlight {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 1.8rem;
+    z-index: 0;
+    margin: 0;
+    padding: 0.6rem;
+    border: 0.15rem solid transparent;
+    box-sizing: border-box;
+    color: var(--note-editor-text);
+    font: inherit;
+    font-size: 1rem;
+    line-height: 1.4;
+    white-space: pre;
+    pointer-events: none;
 }
 
 .note-editor-gutter {
     flex: 0 0 1.8rem;
     overflow: hidden;
+    position: relative;
+    z-index: 2;
     padding-top: 0.6rem;
     background: #e4d2b7;
     border: 0.15rem solid #664c2e;
@@ -151,11 +185,14 @@ fieldset.plain {
     width: 100%;
     flex: 1 1 auto;
     min-height: 8rem;
+    min-width: 0;
     padding: 0.6rem;
     box-sizing: border-box;
     border: 0.15rem solid #664c2e;
     border-radius: 0.25rem;
-    background: #f3e6cf;
+    position: relative;
+    z-index: 1;
+    background: transparent;
     color: #332416;
     font-size: 1rem;
     font-family: inherit;
@@ -164,6 +201,48 @@ fieldset.plain {
     overflow-x: scroll;
     overflow-y: hidden;
     white-space: pre;
+}
+
+#noteInput {
+    color: transparent;
+    caret-color: var(--note-editor-text);
+}
+
+#noteInput::placeholder {
+    color: var(--note-editor-text);
+    opacity: 0.7;
+}
+
+#noteInput::selection {
+    color: var(--note-editor-text);
+    background: #d6c09f;
+}
+
+.note-editor-highlight .note-syntax-tag {
+    color: var(--note-editor-tag);
+}
+
+.note-editor-highlight .note-syntax-arrow {
+    color: var(--note-editor-arrow);
+}
+
+.note-editor-highlight .note-syntax-string {
+    color: var(--note-editor-string);
+}
+
+.note-editor-highlight .note-syntax-metadata {
+    color: var(--note-editor-metadata);
+}
+
+.note-editor-highlight .note-syntax-dice {
+    color: var(--note-editor-dice);
+}
+
+.note-editor-highlight .note-editor-indent {
+    display: inline-block;
+    width: 2ch;
+    box-sizing: border-box;
+    border-left: 1px solid var(--note-editor-indent);
 }
 
 #noteInput.note-input-folded {
@@ -425,6 +504,10 @@ nav {
     padding: 0.4rem;
     width: 100%;
 }
+.nav-note-ignored {
+    filter: grayscale(1);
+    opacity: 0.55;
+}
 .template-action-row {
     display: flex;
     gap: 0.5rem;
@@ -550,6 +633,8 @@ body.notes-fullscreen #noteEdit:not(.hide) #note-tag-controls {
     margin: 0;
     padding: 0.5rem;
     box-sizing: border-box;
+    background: #99866e;
+    border: 0.5rem solid #664c2e;
     overflow-x: hidden;
     overflow-y: auto;
     z-index: 5;

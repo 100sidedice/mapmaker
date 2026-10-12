@@ -198,6 +198,15 @@ export default class Notes {
             typeof note?.text === "string" &&
             note.text.trimStart().startsWith("#ignore");
     }
+    isMarkedIgnoredNote(note) {
+        return typeof note?.text === "string" &&
+            note.text.trimStart().startsWith("#ignore");
+    }
+    markIgnoredNoteButton(button, note) {
+        if (this.isMarkedIgnoredNote(note)) {
+            button.classList.add("nav-note-ignored");
+        }
+    }
     getNoteHistoryKey() {
         if (Number.isInteger(this.editingTemplateIndex)) {
             return `template:${this.editingTemplateIndex}`;
@@ -458,6 +467,7 @@ export default class Notes {
                 const resultButton = document.createElement("button");
                 resultButton.classList.add("nav-note");
                 resultButton.textContent = result.key;
+                this.markIgnoredNoteButton(resultButton, result);
                 // set the button's background color to the note's color
                 if (result.color) {
                     resultButton.style.backgroundColor = result.color;
@@ -1253,6 +1263,7 @@ export default class Notes {
                     const button = document.createElement("button");
                     button.classList.add("nav-note");
                     button.textContent = key.replace("character_", "");
+                    this.markIgnoredNoteButton(button, note);
                     // set the button's background color to the note's color
                     if (note.color) {
                         button.style.backgroundColor = note.color;
@@ -1350,6 +1361,7 @@ export default class Notes {
                     const button = document.createElement("button");
                     button.classList.add("nav-note");
                     button.textContent = key.replace("global_", "");
+                    this.markIgnoredNoteButton(button, note);
                     // set the button's background color to the note's color
                     if (note.color) {
                         button.style.backgroundColor = note.color;
@@ -1827,6 +1839,7 @@ export default class Notes {
                     const button = document.createElement("button");
                     button.classList.add("nav-note");
                     button.textContent = key;
+                    this.markIgnoredNoteButton(button, note);
                     // set the button's background color to the note's color
                     if (note.color) {
                         button.style.backgroundColor = note.color;
@@ -1878,6 +1891,7 @@ export default class Notes {
                     const button = document.createElement("button");
                     button.classList.add("nav-note");
                     button.textContent = key;
+                    this.markIgnoredNoteButton(button, note);
                     // set the button's background color to the note's color
                     if (note.color) {
                         button.style.backgroundColor = note.color;
@@ -1958,6 +1972,7 @@ export default class Notes {
                 markerButton.style.width = "100%";
                 markerButton.style.marginTop = "0.5rem";
                 markerButton.style.backgroundColor = "#cba778";
+                this.markIgnoredNoteButton(markerButton, note);
                 addTooltip(markerButton, note.text || "Marker");
                 markersDetails.appendChild(markerButton);
 
@@ -2079,6 +2094,7 @@ export default class Notes {
                     const button = document.createElement("button");
                     button.classList.add("nav-note");
                     button.textContent = key.replace("group_", "");
+                    this.markIgnoredNoteButton(button, note);
                     // set the button's background color to the note's color
                     if (note.color) {
                         button.style.backgroundColor = note.color;
