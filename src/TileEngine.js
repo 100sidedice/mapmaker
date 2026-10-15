@@ -933,6 +933,13 @@ export default class TileEngine {
     loadMouse(mouse){
         this.mouse = mouse;
 
+        this.mouse.hook("left-down", "tile-undo-snapshot", () => {
+            this.mapMaker.captureUndoSnapshot();
+        }, -300);
+        this.mouse.hook("right-down", "tile-undo-snapshot", () => {
+            this.mapMaker.captureUndoSnapshot();
+        }, -300);
+
         this.mouse.hook("left-down", "tile-marker-select", (pos, event) => {
             if (!this.config.ctrl) return;
             const worldPos = this.mapMaker.screenToWorld(pos.x, pos.y);

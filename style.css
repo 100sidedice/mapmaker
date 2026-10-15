@@ -210,6 +210,7 @@ ul {
 #toolbar {
     grid-area: toolbar;
     display: flex;
+    flex-wrap: wrap;
     justify-content: start;
     align-items: center;
     background: #181922;
@@ -219,6 +220,12 @@ ul {
     z-index: 1;
     gap: 0.5rem;
     padding-top: 0rem;
+}
+#pixelStepStatus {
+    flex-basis: 100%;
+    height: 1rem;
+    color: #b9b9b9;
+    text-align: left;
 }
 #toolbar legend {
     color: #d1d1d1;

@@ -1237,32 +1237,32 @@ export default class Notes {
             parent.appendChild(hr);
         }
         // global
-        function createCharacterNotesSection() {
-            const globalDetails = document.createElement("details");
-            if (openCatagories.includes("Character")) {
-                globalDetails.setAttribute("open", "");
+        function createStandardCatagory(title, prefix){
+            const details = document.createElement("details");
+            if (openCatagories.includes(title)) {
+                details.setAttribute("open", "");
             }
-            globalDetails.id = "Character";
-            const globalSummary = document.createElement("summary");
-            globalSummary.textContent = "Character notes";
-            globalDetails.appendChild(globalSummary);
-            const globalhr = document.createElement("hr");
-            globalhr.style.margin = "0.5rem 0";
-            globalDetails.appendChild(globalhr);
-            const globalFieldset = document.createElement("fieldset");
-            globalFieldset.id = "note-browser-global-notes";
-            globalFieldset.classList.add("plain");
-            globalDetails.appendChild(globalFieldset);
-            // for each note with a key that starts with "character_", create a button in the globalFieldset
+            details.id = title;
+            const summary = document.createElement("summary");
+            summary.textContent = `${title} notes`;
+            details.appendChild(summary);
+            const hr = document.createElement("hr");
+            hr.style.margin = "0.5rem 0";
+            details.appendChild(hr);
+            const fieldset = document.createElement("fieldset");
+            fieldset.id = `note-browser-${prefix}-notes`;
+            fieldset.classList.add("plain");
+            details.appendChild(fieldset);
+            
             let count = 0;
             for (const key in this.mapMaker.notes) {
-                if (key.startsWith("character_")) {
+                if (key.startsWith(prefix)) {
                     count++;
                     const note = this.mapMaker.notes[key];
                     if (this.isIgnoredNote(note)) continue;
                     const button = document.createElement("button");
                     button.classList.add("nav-note");
-                    button.textContent = key.replace("character_", "");
+                    button.textContent = key.replace(prefix, "");
                     this.markIgnoredNoteButton(button, note);
                     // set the button's background color to the note's color
                     if (note.color) {
@@ -1273,7 +1273,7 @@ export default class Notes {
                     button.addEventListener("click", () => {
                         this.goto(key);
                     });
-                    globalFieldset.appendChild(button);
+                    fieldset.appendChild(button);
                 }
             }
             // add a text input for the note title, hidden by default
@@ -1285,12 +1285,12 @@ export default class Notes {
                 // if the input is empty, hide it and show the add button again
                 if (noteTitleInput.value.trim() === "") {
                     noteTitleInput.classList.add("hide");
-                    const addCharacterButton = document.getElementById("note-browser-character-add");
-                    addCharacterButton.classList.remove("hide");
+                    const addButton = document.getElementById(`note-browser-${prefix}-add`);
+                    addButton.classList.remove("hide");
                     return;
                 }
                 // create a new global note with the title as the key
-                const key = "character_" + noteTitleInput.value.trim();
+                const key = `${prefix}` + noteTitleInput.value.trim();
                 this.mapMaker.notes[key] = {
                     "color": "#ff000033", // default color
                     "text": ""
@@ -1298,8 +1298,8 @@ export default class Notes {
                 this.goto(key);
                 // hide the input and show the add button again
                 noteTitleInput.classList.add("hide");
-                const addCharacterButton = document.getElementById("note-browser-character-add");
-                addCharacterButton.classList.remove("hide");
+                const addButton = document.getElementById(`note-browser-${prefix}-add`);
+                addButton.classList.remove("hide");
                 // clear the input
                 noteTitleInput.value = "";
                 // regenerate the categories to show the new note
@@ -1312,126 +1312,29 @@ export default class Notes {
                     noteTitleInput.blur();
                 }
             });
-            globalDetails.appendChild(noteTitleInput);
+            
+            details.appendChild(noteTitleInput);
             if (count > 0) {
                 const bottomHr = document.createElement("hr");
                 bottomHr.style.margin = "0.5rem 0";
-                globalDetails.appendChild(bottomHr);
+                details.appendChild(bottomHr);
             }
             // add a button to add a new global note
-            const addGlobalButton = document.createElement("button");
-            addGlobalButton.id = "note-browser-global-add";
-            addGlobalButton.classList.add("nav-add");
-            addTooltip(addGlobalButton, "Add a global note");
-            addGlobalButton.textContent = "Add note";
-            addGlobalButton.addEventListener("click", () => {
+            const addButton = document.createElement("button");
+            addButton.id = `note-browser-${prefix}-add`;
+            addButton.classList.add("nav-add");
+            addTooltip(addButton, "Add a global note");
+            addButton.textContent = "Add note";
+            addButton.addEventListener("click", () => {
                 // hide this button and show the note title input
-                addGlobalButton.classList.add("hide");
+                addButton.classList.add("hide");
                 noteTitleInput.classList.remove("hide");
                 noteTitleInput.focus();
             });
-            globalDetails.appendChild(addGlobalButton);
+            details.appendChild(addButton);
 
             // append the globalDetails to the noteBrowser
-            noteBrowser.appendChild(globalDetails);
-        }
-        function createGlobalNotesSection() {
-            const globalDetails = document.createElement("details");
-            if (openCatagories.includes("Global")) {
-                globalDetails.setAttribute("open", "");
-            }
-            globalDetails.id = "Global";
-            const globalSummary = document.createElement("summary");
-            globalSummary.textContent = "Global notes";
-            globalDetails.appendChild(globalSummary);
-            const globalhr = document.createElement("hr");
-            globalhr.style.margin = "0.5rem 0";
-            globalDetails.appendChild(globalhr);
-            const globalFieldset = document.createElement("fieldset");
-            globalFieldset.id = "note-browser-global-notes";
-            globalFieldset.classList.add("plain");
-            globalDetails.appendChild(globalFieldset);
-            // for each note with a key that starts with "global_", create a button in the globalFieldset
-            let count = 0;
-            for (const key in this.mapMaker.notes) {
-                if (key.startsWith("global_")) {
-                    count++;
-                    const note = this.mapMaker.notes[key];
-                    if (this.isIgnoredNote(note)) continue;
-                    const button = document.createElement("button");
-                    button.classList.add("nav-note");
-                    button.textContent = key.replace("global_", "");
-                    this.markIgnoredNoteButton(button, note);
-                    // set the button's background color to the note's color
-                    if (note.color) {
-                        button.style.backgroundColor = note.color;
-                    } else {
-                        button.style.backgroundColor = "#cba778"; // default color
-                    }
-                    button.addEventListener("click", () => {
-                        this.goto(key);
-                    });
-                    globalFieldset.appendChild(button);
-                }
-            }
-            // add a text input for the note title, hidden by default
-            const noteTitleInput = document.createElement("textarea");
-            noteTitleInput.id = "note-browser-title-input";
-            noteTitleInput.placeholder = "Enter note title...";
-            noteTitleInput.classList.add("note-title", "hide");
-            noteTitleInput.addEventListener("blur", () => {
-                // if the input is empty, hide it and show the add button again
-                if (noteTitleInput.value.trim() === "") {
-                    noteTitleInput.classList.add("hide");
-                    const addGlobalButton = document.getElementById("note-browser-global-add");
-                    addGlobalButton.classList.remove("hide");
-                    return;
-                }
-                // create a new global note with the title as the key
-                const key = "global_" + noteTitleInput.value.trim();
-                this.mapMaker.notes[key] = {
-                    "color": "#ff000033", // default color
-                    "text": ""
-                };
-                this.goto(key);
-                // hide the input and show the add button again
-                noteTitleInput.classList.add("hide");
-                const addGlobalButton = document.getElementById("note-browser-global-add");
-                addGlobalButton.classList.remove("hide");
-                // clear the input
-                noteTitleInput.value = "";
-                // regenerate the catagories to show the new note
-                this.generateCatagories();
-            });
-            // add an event listener for the enter key to blur the input
-            noteTitleInput.addEventListener("keydown", (event) => {
-                if (event.key === "Enter") {
-                    event.preventDefault();
-                    noteTitleInput.blur();
-                }
-            });
-            globalDetails.appendChild(noteTitleInput);
-            if (count > 0) {
-                const bottomHr = document.createElement("hr");
-                bottomHr.style.margin = "0.5rem 0";
-                globalDetails.appendChild(bottomHr);
-            }
-            // add a button to add a new global note
-            const addGlobalButton = document.createElement("button");
-            addGlobalButton.id = "note-browser-global-add";
-            addGlobalButton.classList.add("nav-add");
-            addTooltip(addGlobalButton, "Add a global note");
-            addGlobalButton.textContent = "Add note";
-            addGlobalButton.addEventListener("click", () => {
-                // hide this button and show the note title input
-                addGlobalButton.classList.add("hide");
-                noteTitleInput.classList.remove("hide");
-                noteTitleInput.focus();
-            });
-            globalDetails.appendChild(addGlobalButton);
-
-            // append the globalDetails to the noteBrowser
-            noteBrowser.appendChild(globalDetails);
+            noteBrowser.appendChild(details);
         }
 
         // keywords
@@ -1814,110 +1717,6 @@ export default class Notes {
             noteBrowser.appendChild(templatesDetails);
         }
 
-        function getTileNotesSection() {
-            const details = document.createElement("details");
-            if (openCatagories.includes("Tile Notes")) {
-                details.setAttribute("open", "");
-            }
-            details.id = "Tile Notes";
-            const summary = document.createElement("summary");
-            summary.textContent = "Tile Notes";
-            details.appendChild(summary);
-            // add hr
-            const hr = document.createElement("hr");
-            hr.style.margin = "0.5rem 0";
-            details.appendChild(hr);
-            const fieldset = document.createElement("fieldset");
-            fieldset.id = "note-browser-tile-notes";
-            fieldset.classList.add("plain");
-            details.appendChild(fieldset);
-            // for each note in the format of "rx_ry_lx_ly", create a button in the fieldset
-            for (const key in this.mapMaker.notes) {
-                if (/^\d+_\d+_\d+_\d+$/.test(key)) {
-                    const note = this.mapMaker.notes[key];
-                    if (this.isIgnoredNote(note)) continue;
-                    const button = document.createElement("button");
-                    button.classList.add("nav-note");
-                    button.textContent = key;
-                    this.markIgnoredNoteButton(button, note);
-                    // set the button's background color to the note's color
-                    if (note.color) {
-                        button.style.backgroundColor = note.color;
-                    } else {
-                        button.style.backgroundColor = "#cba778"; // default color
-                    }
-                    // change text color based on the background color's luminance
-                    const rgb = getRGB(note.color);
-                    if (rgb) {
-                        const [r, g, b] = rgb;
-                        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-                        if (luminance < 0.5) {
-                            button.style.setProperty("color", "#ffffff", "important");
-                        } else {
-                            button.style.setProperty("color", "#332416", "important");
-                        }
-                    }
-                    button.addEventListener("click", () => {
-                        this.goto(key);
-                    });
-                    fieldset.appendChild(button);
-                }
-            }
-            noteBrowser.appendChild(details);
-        }
-
-        function getRegionNotesSection() {
-            const details = document.createElement("details");
-            if (openCatagories.includes("Region Notes")) {
-                details.setAttribute("open", "");
-            }
-            details.id = "Region Notes";
-            const summary = document.createElement("summary");
-            summary.textContent = "Region Notes";
-            details.appendChild(summary);
-            // add hr
-            const hr = document.createElement("hr");
-            hr.style.margin = "0.5rem 0";
-            details.appendChild(hr);
-            const fieldset = document.createElement("fieldset");
-            fieldset.id = "note-browser-region-notes";
-            fieldset.classList.add("plain");
-            details.appendChild(fieldset);
-            // for each note in the format of "rx_ry", create a button in the fieldset
-            for (const key in this.mapMaker.notes) {
-                if (/^\d+_\d+$/.test(key)) {
-                    const note = this.mapMaker.notes[key];
-                    if (this.isIgnoredNote(note)) continue;
-                    const button = document.createElement("button");
-                    button.classList.add("nav-note");
-                    button.textContent = key;
-                    this.markIgnoredNoteButton(button, note);
-                    // set the button's background color to the note's color
-                    if (note.color) {
-                        button.style.backgroundColor = note.color;
-                    } else {
-                        button.style.backgroundColor = "#cba778"; // default color
-                    }
-                    // change text color based on the background color's luminance
-                    const rgb = getRGB(note.color);
-                    if (rgb) {
-                        const [r, g, b] = rgb;
-                        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-                        if (luminance < 0.5) {
-                            button.style.setProperty("color", "#ffffff", "important");
-                        } else {
-                            button.style.setProperty("color", "#332416", "important");
-                        }
-                    }
-                    button.addEventListener("click", () => {
-                        this.goto(key);
-                    });
-                    fieldset.appendChild(button);
-                }
-            }
-            noteBrowser.appendChild(details);
-        }
-
         function getMarkerNotesSection() {
             const markersDetails = document.createElement("details");
             markersDetails.open = openCatagories.includes("Markers");
@@ -2271,9 +2070,9 @@ export default class Notes {
             noteBrowser.appendChild(uploadDetails);
         }
 
-        createGlobalNotesSection.call(this);
+        createStandardCatagory.call(this,"Global","global_");
         addHr(noteBrowser);
-        createCharacterNotesSection.call(this);
+        createStandardCatagory.call(this,"Character","character_");
         if (!this.mapMaker.uploadMode) {
             addHr(noteBrowser);
             createKeywordsSection.call(this);
@@ -2281,21 +2080,7 @@ export default class Notes {
             createTemplatesSection.call(this);
         }
 
-        if (!this.mapMaker.uploadMode) {
-            addHr(noteBrowser);
-            createUploadSection.call(this);
-        }
-
-        // show tile notes if we have any, otherwise show region notes
-        if (Object.keys(this.mapMaker.notes).some(key => /^\d+_\d+_\d+_\d+$/.test(key))) {
-            return; // early returning this catagory for lag; will make toggleable when I add a settings menu 
-            addHr(noteBrowser);
-            getTileNotesSection.call(this);
-        } 
-        if (Object.keys(this.mapMaker.notes).some(key => /^\d+_\d+$/.test(key))) {
-            addHr(noteBrowser);
-            getRegionNotesSection.call(this);
-        }
+        
         if (Object.keys(this.mapMaker.notes).some(key => /^group_/.test(key))) {
             addHr(noteBrowser);
             getGroupNotesSection.call(this);
@@ -2307,6 +2092,10 @@ export default class Notes {
         if (Object.keys(this.mapMaker.notes).some(key => /^scribble_/.test(key))) {
             addHr(noteBrowser);
             getAnnotatedNotesSection.call(this);
+        }
+        if (!this.mapMaker.uploadMode) {
+            addHr(noteBrowser);
+            createUploadSection.call(this);
         }
     }
 
@@ -2383,17 +2172,6 @@ function getOpenCatagories(){
     });
     return openCatagories;
 }
-/**
- * Creates a color selection slider.
- * @param {HTMLElement} container - Container to append the slider to.
- * @param {(color: string) => void} onChange - Callback fired when the selected color changes.
- * @param {boolean} alpha - Whether to include an alpha gradient.
- * @param {string} initialColor - Initial color used to position the handle.
- * @param {string} width - Optional CSS width.
- * @param {string} height - Optional CSS height.
- * @param {boolean} grayScale - Whether to use a linear white-to-black grayscale gradient.
- * @returns {[HTMLElement, (color?: string) => void]} Slider wrapper and handle loader.
- */
 /**
  * Creates a color selection slider.
  * @param {HTMLElement} container - Container to append the slider to.

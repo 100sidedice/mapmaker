@@ -63,6 +63,8 @@ class MapMaker extends App{
 		this.annotations = []; // {color, points:[{x,y}], left, top, right, bottom}
 		this.markers = [];
 		this.regions = {};
+		this.undoHistory = [];
+		this.pixelSelection = [];
 		this.lastPicked = null;
 		this.uploadMode = false;
 
@@ -95,7 +97,9 @@ class MapMaker extends App{
 			lastPicked: null,
 			markerMode: false,
 			selectedMarker: null,
-			ctrlFromButton: false
+			ctrlFromButton: false,
+			pixelStep: 5,
+			pixelColorMode: "value"
 		}
 		this.zoomLevel = 1;
 		// give a default region type (default hash is filled floor with wall outline)
@@ -163,6 +167,8 @@ class MapMaker extends App{
 			this.annotations = save.annotations ?? this.annotations;
 			this.markers = save.markers ?? this.markers;
 		}
+		this.config.pixelStep ??= 5;
+		this.config.pixelColorMode ??= "value";
 
 		await this.loadImages(save?.images);
 		this.PixelEngine = new PixelEngine(this);
@@ -189,13 +195,13 @@ class MapMaker extends App{
 			} else {
 				this.config.selectedColor = color;
 			}
-		}, false, this.config.selectedColor, "5rem", "3rem", true);
+		}, false, this.config.selectedColor, "5rem", "3rem", false);
 		this.colorSliderEvent = event;
 		slider.id = "colorSlider";
 		if (this.zoomLevel === 1) {
 			this.colorSliderEvent(this.config.annotate_color, true, false);
 		} else {
-			this.colorSliderEvent(this.config.selectedColor, false, true);
+			this.updatePixelColorPicker(this.config.selectedColor);
 		}
 		this.createToolbar();
 		this.saver.startAutosave(this.images);
@@ -333,6 +339,82 @@ class MapMaker extends App{
 		if (this.zoomLevel === 1) this.TileEngine.loadMouse(this.mouse)
 		if (this.zoomLevel === 2) this.RegionEngine.loadMouse(this.mouse)
 		if (this.zoomLevel === 3) this.SpaceEngine.loadMouse(this.mouse)
+	}
+
+	captureUndoSnapshot() {
+		const images = {};
+		for (const [tileType, image] of Object.entries(this.images)) {
+			if (!(image instanceof HTMLCanvasElement)) continue;
+			const imageData = image.getContext("2d").getImageData(0, 0, image.width, image.height);
+			images[tileType] = {
+				width: imageData.width,
+				height: imageData.height,
+				data: Array.from(imageData.data)
+			};
+		}
+
+		this.undoHistory.push({
+			map: JSON.parse(JSON.stringify(this.map)),
+			annotations: JSON.parse(JSON.stringify(this.annotations)),
+			pixelSelection: [...this.pixelSelection],
+			images
+		});
+		if (this.undoHistory.length > 100) {
+			this.undoHistory.shift();
+		}
+	}
+
+	showPixelStepStatus() {
+		const status = document.getElementById("pixelStepStatus");
+		if (!status) return;
+		const mode = this.config.pixelColorMode[0].toUpperCase() + this.config.pixelColorMode.slice(1);
+		status.textContent = `${this.config.pixelStep}% - ${mode}`;
+		status.classList.remove("hide");
+		clearTimeout(this.pixelStepStatusTimeout);
+		this.pixelStepStatusTimeout = setTimeout(() => {
+			status.classList.add("hide");
+		}, 1000);
+	}
+
+	updatePixelColorPicker(color) {
+		const canvas = document.createElement("canvas");
+		canvas.width = 1;
+		canvas.height = 1;
+		const context = canvas.getContext("2d");
+		context.fillStyle = color;
+		context.fillRect(0, 0, 1, 1);
+		const [red, green, blue] = context.getImageData(0, 0, 1, 1).data;
+		const grayScale = red === green && green === blue;
+		this.colorSliderEvent(color, false, grayScale);
+	}
+
+	undo() {
+		const snapshot = this.undoHistory.pop();
+		if (!snapshot) return false;
+
+		this.map = snapshot.map;
+		this.annotations = snapshot.annotations;
+		this.pixelSelection = snapshot.pixelSelection || [];
+		for (const [tileType, imageData] of Object.entries(snapshot.images || {})) {
+			const image = this.images[tileType];
+			if (!(image instanceof HTMLCanvasElement)) continue;
+			const ctx = image.getContext("2d");
+			const restored = ctx.createImageData(imageData.width, imageData.height);
+			restored.data.set(imageData.data);
+			ctx.putImageData(restored, 0, 0);
+		}
+		this.rebuildRegionTypes();
+		if (this.zoomLevel === 1) {
+			this.TileEngine.queue.clear();
+			this.TileEngine.updateRegions();
+		} else if (this.zoomLevel === 2) {
+			this.RegionEngine.queue.clear();
+			this.RegionEngine.updateRegions();
+		} else if (this.zoomLevel === 0) {
+			this.PixelEngine.queue.clear();
+			this.PixelEngine.updateRegions();
+		}
+		return true;
 	}
 	
 
@@ -647,7 +729,9 @@ class MapMaker extends App{
 		const selectButton = document.getElementById("select");
 		selectButton.addEventListener("click", () => {
 			let action = "enable-selection";
-			if (this.zoomLevel === 1 && !this.config.selectionExists) action = "enable-selection";
+			if (this.zoomLevel === 0 && !this.config.pixelSelectionExists) action = "enable-selection";
+			else if (this.zoomLevel === 0 && this.config.pixelSelectionExists) action = "pixel-disable-selection";
+			else if (this.zoomLevel === 1 && !this.config.selectionExists) action = "enable-selection";
 			else if (this.zoomLevel === 2 && !this.config.regionSelectionExists) action = "enable-selection";
 			else if (this.zoomLevel === 3 && !this.config.regionSelectionExists) action = "enable-selection";
 			else if (this.zoomLevel === 1 && this.config.selectionExists) action = "tile-disable-selection";
@@ -664,6 +748,10 @@ class MapMaker extends App{
 				case "enable-selection":
 					this.keyMap["Alt"]["action"]();
 					console.log(this.config.alt)
+					break;
+				case "pixel-disable-selection":
+					this.PixelEngine.deselectAll();
+					this.keyMap["Alt"]["release-action"]();
 					break;
 				case "tile-disable-selection":
 					this.keyMap["Alt"]["release-action"]();
@@ -837,15 +925,7 @@ class MapMaker extends App{
 		});
 		const undoButton = document.getElementById("undo");
 		undoButton.addEventListener("click", () => {
-			// remove last annotation
-			// remove note attached to the last annotation
-			if (this.annotations.length > 0) {
-				const lastAnnotation = this.annotations[this.annotations.length - 1];
-				if (lastAnnotation.note) {
-					this.config.notes = this.config.notes.filter(note => note !== lastAnnotation.note);
-				}
-			}
-			this.annotations.pop();
+			this.undo();
 		});
 	}
 	updateToolbar(){
@@ -855,7 +935,6 @@ class MapMaker extends App{
 			const selectButton = document.getElementById("select");
 			// Hide
 			let hidden = false;
-			if (this.zoomLevel === 0) hidden = true;
 			if (this.zoomLevel === 1 && this.config.annotate) hidden = true;
 			if (this.config.showPreview) hidden = true;
 			if (this.config.selectedMarker !== null) hidden = true;
@@ -967,9 +1046,6 @@ class MapMaker extends App{
 			const button = document.getElementById("undo");
 			// Hide
 			let hidden = false;
-			if (this.zoomLevel === 0) hidden = true;
-			if (this.zoomLevel === 1 && !this.config.annotate) hidden = true;
-			if (this.zoomLevel === 2) hidden = true;
 			if (this.zoomLevel === 3) hidden = true;
 			if (this.config.selectedMarker !== null) hidden = true;
 			if (this.config.showPreview) hidden = true;
@@ -1191,11 +1267,11 @@ class MapMaker extends App{
 			if (this.zoomLevel === 1) {
 				this.colorSliderEvent(this.config.annotate_color, true, false);
 			} else {
-				this.colorSliderEvent(this.config.selectedColor, false, true);
+				this.updatePixelColorPicker(this.config.selectedColor);
 			}
 			// if going to pixel scope, change color slider to selected color
 			if (this.zoomLevel === 0) {
-				this.colorSliderEvent(this.config.selectedColor, false, true);
+				this.updatePixelColorPicker(this.config.selectedColor);
 			}
 		}
 		let hide = false;

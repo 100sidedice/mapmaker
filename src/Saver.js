@@ -103,6 +103,10 @@ export default class Saver {
 		const result = {};
 
 		for (const [key, image] of Object.entries(images)) {
+			if (!image || typeof image !== "object") {
+				console.warn(`Skipping invalid image "${key}" while saving.`);
+				continue;
+			}
 			const canvas = document.createElement("canvas");
 			canvas.width = image.naturalWidth || image.width;
 			canvas.height = image.naturalHeight || image.height;
@@ -112,9 +116,10 @@ export default class Saver {
 			const ctx = canvas.getContext("2d");
 			ctx.drawImage(image, 0, 0);
 
-			result[key] = await new Promise(resolve => {
+			const blob = await new Promise(resolve => {
 				canvas.toBlob(resolve, "image/png");
 			});
+			if (blob) result[key] = blob;
 		}
 
 		return result;

@@ -78,6 +78,7 @@
                 <ul>
                     <li>Right-click to erase</li>
                     <li>Cycle item with q & e</li>
+                    <li>Click Undo to restore the map before the last tile or region click</li>
                     <li>Ctrl to eyedrop tile</li>
                 </ul>
                 <p>Another method to place many files...</p>
@@ -327,6 +328,28 @@
                 </ul>
 
             </details>
+            <details>
+                <summary>Update 4 - Connected</summary>
+                <h3>Server-side storage!</h3>
+                <ul>
+                    <li>I have intergrated firebase for server-side storage.</li>
+                    <li>Just type in a id and click upload, give the players that URL.</li>
+                    <li>use #ignore at a start of a note (or class="ignore" for one element) to hide it from uploaded view.</li>
+                </ul>
+                <h3>undo functionality</h3>
+                <ul>
+                    <li>Yes, I finally added an undo button!</li>
+                </ul>
+                <h3>Pixel-mode imporvements</h3>
+                <ul>
+                    <li>Added tools from my pixel-art editor to this program.</li>
+                    <li>- Selecting pixels</li>
+                    <li>- Color stepping (6/7/8) = channel, (+/-) for %, (h/k) to step.</li>
+                    <li>- Line tool (l - connect the dots with selected pixels)</li>
+                    <li>- alt+f to select fill, s to select color.</li>
+                </ul>
+                
+            </details>
         </aside>
         <button id="close-instructions">Close Information</button>
         <aside id="notes" class="">
@@ -393,6 +416,7 @@
             <button id="marker-cancel" class="hide">Cancel</button>
             <button id="brushSize" class="">Size</button>
             <button id="swap-tile" class="mobile-only">Swap</button>
+            <span id="pixelStepStatus" class="hide" aria-live="polite"></span>
         </fieldset>
         <div id="overlay" class="hide"></div>
         <menu id="conformation" class="hide">

@@ -6,7 +6,6 @@ export default class RegionEngine {
 
         this.queue = new Map(); // for rasterization of regions
     }
-
     load(mapMaker){
         this.keyMap = mapMaker.keyMap;
         this.config = mapMaker.config;
@@ -814,6 +813,13 @@ export default class RegionEngine {
     loadMouse(mouse){
         this.mouse = mouse;
 
+        this.mouse.hook("left-down", "region-undo-snapshot", () => {
+            this.mapMaker.captureUndoSnapshot();
+        }, -300);
+        this.mouse.hook("right-down", "region-undo-snapshot", () => {
+            this.mapMaker.captureUndoSnapshot();
+        }, -300);
+
         this.mouse.hook("left-down", "marker-select", (pos, event) => {
             if (!this.config.ctrl) return;
             const worldPos = this.localToWorld(pos.x, pos.y);
@@ -977,4 +983,3 @@ export default class RegionEngine {
         return tiles.map(row => row.map(tile => Array.isArray(tile) ? [...tile] : tile));
     }
 }
-
