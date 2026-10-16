@@ -1,13 +1,9 @@
 export function detectTrackpad(event) {
-    if (event.deltaMode !== 0) {
-        return false;
-    }
-
     if (event.deltaX !== 0) {
         return true;
     }
 
-    return Math.abs(event.deltaY) < 5;
+    //return Math.abs(event.deltaY) < 0.5;
 }
 
 export default class Mouse {

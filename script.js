@@ -1244,6 +1244,7 @@ class MapMaker extends App{
 		
 		// Zoom levels. [Pixel scope, Tile scope, Region scope]
 		const zoomLevels = [20, 0.7, 0.2];
+		if (this.zoomLevel === 0) zoomLevels[0] = 10;
 		const prevZoomLevel = this.zoomLevel;
 		if (this.camera.zoom >= zoomLevels[0]) {
 			this.zoomLevel = 0;
