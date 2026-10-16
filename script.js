@@ -666,7 +666,7 @@ class MapMaker extends App{
 
 		const rasterizeButton = document.getElementById("Rasterize");
 		rasterizeButton.addEventListener("click", () => {
-			this.rebuildRegionTypes();
+			this.downloadMap();
 		});
 
 		const closeInstructionsButton = document.getElementById("close-instructions");
@@ -1379,6 +1379,64 @@ class MapMaker extends App{
 		if (!this.regionTypes.has(this.config.selectedRegionType)) {
 			this.config.selectedRegionType = this.defaultRegionHash;
 		}
+	}
+	downloadMap(){
+		// calc bounds of map
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+		for (const key in this.map) {
+			const [x, y] = key.split("_").map(Number);
+			minX = Math.min(minX, x);
+			minY = Math.min(minY, y);
+			maxX = Math.max(maxX, x);
+			maxY = Math.max(maxY, y);
+		}
+		const pxWidth = (maxX - minX + 1) * 8 * 16;
+		const pxHeight = (maxY - minY + 1) * 8 * 16;
+		const canvas = document.createElement("canvas");
+		canvas.width = pxWidth;
+		canvas.height = pxHeight;
+		const ctx = canvas.getContext("2d");
+		ctx.fillStyle = "#000000";
+		ctx.fillRect(0, 0, pxWidth, pxHeight);
+		ctx.imageSmoothingEnabled = false;
+		for (const key in this.map) {
+			const [x, y] = key.split("_").map(Number);
+			const tiles = this.map[key].tiles;
+			for (let row = 0; row < 8; row++) {
+				for (let col = 0; col < 8; col++) {
+					const tile = tiles[row][col];
+					if (Array.isArray(tile) && tile[0]) {
+						const img = this.images[tile[0]];
+						if (img) {
+							ctx.drawImage(
+								img,
+								0, 0, img.width, img.height,
+								(x - minX) * 8 * 16 + col * 16,
+								(y - minY) * 8 * 16 + row * 16,
+								16, 16
+							);
+						}
+					}
+				}
+			}
+		}
+		const link = document.createElement("a");
+		// prompt for filename. use extension if givin
+		let filename = prompt("Enter filename (png,jpeg,webp):", "map.png");
+		if (!filename) return;
+		if (!filename.includes(".")) filename += ".png";
+		link.download = filename;
+		if (filename.endsWith(".png")) link.href = canvas.toDataURL("image/png");
+		else if (filename.endsWith(".jpeg") || filename.endsWith(".jpg")) link.href = canvas.toDataURL("image/jpeg");
+		else if (filename.endsWith(".webp")) link.href = canvas.toDataURL("image/webp");
+		else {
+			alert("Unsupported file extension. Please use .png, .jpeg, or .webp");
+			return;
+		}
+		link.click();
 	}
 	
 }
