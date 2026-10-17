@@ -45,25 +45,6 @@
                     <li>Middle-drag to pan</li>
                     <li>Click 'Download Map' to save your creation</li>
                 </ul>
-                <p><i>~Digital to real-world</i></p>
-                <p>
-                    Like I said in the beginning, this is for my 3d printed tile system. <br>
-                    You need a 3d printer to use it in full. <br>
-                    If you don't have one, you can still use it digitally, or simply print it out on paper. <br>
-                    <br>
-                    But for those who do, here's how to get your map into the real world: <br>
-                </p>
-                <ul>
-                    <li>First, download the map, same way as before. </li>
-                    <li>Click the 'Get STLS' button to download the STLS for your printer. </li>
-                    <li>Print the Mats in TPU (95A)</li>
-                    <li>Everything else is PLA</li>
-                    <li>Print out the tiles</li>
-                    <li>Cut them out</li>
-                    <li>Use the puncher to peirce the paper</li>
-                    <li>Then put a pin in the holes</li>
-                    <li>Everything else builds from this structure. You can even make your own if you know some basic modeling, from the base pins.</li>
-                </ul>
             </details>
             <details>
                 <summary>—Speeding up—</summary>
@@ -77,7 +58,7 @@
                 <p>Also, going to that top toolbar is annoying.</p>
                 <ul>
                     <li>Right-click to erase</li>
-                    <li>Cycle item with q & e</li>
+                    <li>Cycle item with h & k</li>
                     <li>Click Undo to restore the map before the last tile or region click</li>
                     <li>Ctrl to eyedrop tile</li>
                 </ul>
@@ -227,6 +208,7 @@
                 <summary>—The end—</summary>
                 <p><i>..finally...</i></p>
                 <p>Well, that's all I have to say for now. I hope you enjoy using this map maker as much as I enjoyed making it.</p>
+                <p>I will be giving this program updates every once in a while. They will be listed below of what had changed. They can range from small bug fixes to major features.</p>
                 <p>For some devleopment-related stats:</p>
                 <ul>
                     <li>Time spent: Roughly 25 hours within 3 days</li>
@@ -293,7 +275,7 @@
             </details>
             <details>
                 <summary>Update 3 - Markers</summary>
-                <h3>Markers! (Region scope)</h3>
+                <h3>Markers! (Tile scope)</h3>
                 <ul>
                     <li>You can add a marker to do things like mark say player locations.</li>
                     <li>The UI for them is similar to keywords, should be easy to figure out.</li>
@@ -349,6 +331,35 @@
                     <li>- alt+f to select fill, s to select color.</li>
                 </ul>
                 
+            </details>
+            <details>
+                <summary>Update 5 - Maskin and tilin</summary>
+                <h3>Tile masking!</h3>
+                <ul>
+                    <li>I have implimented tile masking.</li>
+                    <li>Select some tiles, then hit 'm' to focus on those tiles. It mask everything else</li>
+                    <li>You can use this to say, not accidently effect neighboring tiles in pixel mode, or safeguarding areas.</li>
+                </ul>
+                <h3>Special masks</h3>
+                <ul>
+                    <li>Certain mask shapes I'll be adding special features too.</li>
+                    <li>The first one, if you add a mask to a 4x4 region you may notice some darkened pixels.</li>
+                    <li>Treat that as a tile template - everything darkened is walls, everything else is floor</li>
+                    <li>Then select the 4x4 again and press m again.</li>
+                    <li>Your brush will swap tiles placed based on that tileset, saving a LOT of time if used right.</li>
+                    <li>Or if your lazy to create 16 tiles, just fill the all light and all dark tiles (#3 and #7), and only select those before exiting mask, and it'll generate the rest of the set for you.</li>
+                </ul>
+                <h3>Fixed Issues/minor changes</h3>
+                <ul>
+                    <li>Swaped tile cycle to h/k keybinds, to match color-step controls.</li>
+                    <li>Line tool works in tilemode, albiet a little worse due to not storing selection in order like pixel mode.</li>
+                    <li>Swapped raterize button for a download image button.</li>
+                    <li>Stopped a crash shen deleting a tile, where none would be selected and you try placing it. Now you just place the add tile button instead. Since well, perhaps you should make one.</li>
+                    <li>Adjusted the fill algorithm. Should not feel different from before, however now it allows bewtween chunks if a mask is active.</li>
+                    <li>Tile-outline tool now outlines selection, without outlining region borders as well.</li>
+                    
+
+                </ul>
             </details>
         </aside>
         <button id="close-instructions">Close Information</button>

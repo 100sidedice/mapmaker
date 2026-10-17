@@ -51,7 +51,6 @@ export default class TileEngine {
                             this.ctx.strokeStyle = 'rgb(0, 255, 255)';
                             this.ctx.lineWidth = 2;
                             this.ctx.strokeRect((regionX * 8 + col) * 32, (regionY * 8 + row) * 32, 32, 32);
-                            // add little square in the top left corner to indicate selected tile
                             this.ctx.fillStyle = 'rgb(0, 255, 255)';
                             this.ctx.fillRect((regionX * 8 + col) * 32, (regionY * 8 + row) * 32, 5, 5);
                         }
@@ -66,6 +65,25 @@ export default class TileEngine {
                     }
                 }
             }
+        }
+        for (const pixel of this.mapMaker.pixelSelection) {
+            const [x, y] = pixel.split("_").map(Number);
+            if (x < startRegionX * 256 || x > (endRegionX + 1) * 256 ||
+                y < startRegionY * 256 || y > (endRegionY + 1) * 256) {
+                continue;
+            }
+            this.ctx.strokeStyle = "rgba(0, 255, 255, 0.55)";
+            this.ctx.lineWidth = 0.05;
+            this.ctx.strokeRect(x, y, 1, 1);
+            this.ctx.fillStyle = "rgba(0, 255, 255, 0.55)";
+            this.ctx.fillRect(x, y, 0.2, 0.2);
+        }
+        if (this.config.focus){
+            // darken everything except the focused tiles
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            this.ctx.fillRect(startRegionX * 32 * 8, startRegionY * 32 * 8, (endRegionX - startRegionX + 1) * 32 * 8, (endRegionY - startRegionY + 1) * 32 * 8);
+            this.focusRenderer()
+
         }
         // draw last picked tile with a yellow outline
         if (this.config.lastPicked) {
@@ -94,6 +112,9 @@ export default class TileEngine {
                     // fill region with semi-transparent color if it doesn't exist
                     if (!this.mapMaker.map[`${regionX}_${regionY}`]) {
                         this.ctx.fillStyle = 'rgb(216, 204, 178)';
+                        if (this.config.focus){
+                            this.ctx.fillStyle = 'rgb(99, 91, 75)';
+                        }
                         this.ctx.fillRect(regionX * 8 * 32, regionY * 8 * 32, 8 * 32, 8 * 32);
                     }
                 }
@@ -265,6 +286,115 @@ export default class TileEngine {
         }
     }
 
+    focusRenderer() {
+        this.ctx.imageSmoothingEnabled = false;
+
+        for (const key of this.config.tilesInFocus) {
+            const [regionX, regionY, col, row] = key.split('_').map(Number);
+            const regionKey = `${regionX}_${regionY}`;
+            const region = this.mapMaker.map[regionKey];
+
+            if (!region) continue;
+
+            const tile = region.tiles[row][col];
+            if (tile === "") continue;
+
+            const x = (regionX * 8 + col) * 32;
+            const y = (regionY * 8 + row) * 32;
+            const tileType = tile[0];
+            const img = this.mapMaker.images[tileType];
+
+            if (img) {
+                this.ctx.drawImage(img, x, y, 32, 32);
+            }
+
+            if (tile[1] === "selected") {
+                this.ctx.strokeStyle = 'rgb(0, 255, 255)';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(x, y, 32, 32);
+                this.ctx.fillStyle = 'rgb(0, 255, 255)';
+                this.ctx.fillRect(x, y, 5, 5);
+            }
+
+            const noteKey = `${regionX}_${regionY}_${col}_${row}`;
+            const note = this.mapMaker.notes[noteKey];
+
+            if (note) {
+                this.ctx.fillStyle = note.color || "#ffff0033";
+                this.ctx.fillRect(x, y, 32, 32);
+            }
+        }
+
+		// Show the 4x4 autotile mask when exactly 16 tiles are focused.
+		if (this.config.tilesInFocus.size !== 16) return;
+
+		const focusedTiles = [...this.config.tilesInFocus].map(key => {
+			const [regionX, regionY, col, row] = key.split("_").map(Number);
+			return {
+				regionX,
+				regionY,
+				col,
+				row,
+				x: regionX * 8 + col,
+				y: regionY * 8 + row
+			};
+		});
+
+		const minX = Math.min(...focusedTiles.map(tile => tile.x));
+		const minY = Math.min(...focusedTiles.map(tile => tile.y));
+
+		// Ensure the focused tiles form a contiguous 4x4 region.
+		if (
+			Math.max(...focusedTiles.map(tile => tile.x)) !== minX + 3 ||
+			Math.max(...focusedTiles.map(tile => tile.y)) !== minY + 3 ||
+			new Set(focusedTiles.map(tile => `${tile.x}_${tile.y}`)).size !== 16
+		) {
+			return;
+		}
+
+		const maskByPosition = [
+			["0001", "0010", "0000", "1001"],
+			["0100", "1000", "1111", "0110"],
+			["0011", "1010", "1110", "1101"],
+			["0101", "1100", "1011", "0111"]
+		];
+
+		this.ctx.save();
+		this.ctx.font = "bold 14px monospace";
+		this.ctx.textAlign = "center";
+		this.ctx.textBaseline = "middle";
+
+		for (let row = 0; row < 4; row++) {
+            for (let col = 0; col < 4; col++) {
+                const tileX = minX + col;
+                const tileY = minY + row;
+                const x = tileX * 32;
+                const y = tileY * 32;
+                const mask = maskByPosition[row][col];
+
+                if (mask === "0000") continue;
+
+                this.ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+
+                if (mask[0] === "1") {
+                    this.ctx.fillRect(x, y, 16, 16);
+                }
+                if (mask[1] === "1") {
+                    this.ctx.fillRect(x + 16, y, 16, 16);
+                }
+                if (mask[2] === "1") {
+                    this.ctx.fillRect(x, y + 16, 16, 16);
+                }
+                if (mask[3] === "1") {
+                    this.ctx.fillRect(x + 16, y + 16, 16, 16);
+                }
+            }
+        }
+
+		this.ctx.restore();
+
+    }
+
     brush(pos, method="click", startTileX=null, startTileY=null, endTileX=null, endTileY=null){
         const worldPos = this.mapMaker.screenToWorld(pos.x, pos.y);
         // wrapped so that later we can add in other tools if we want
@@ -298,7 +428,7 @@ export default class TileEngine {
         const endRegionX = Math.floor(endTileX / 8);
         const startRegionY = Math.floor(startTileY / 8);
         const endRegionY = Math.floor(endTileY / 8);
-        
+        const changedTiles = new Set();
         
         if (startRegionX < 0 || startRegionY < 0) {
             return; // don't allow negative regions
@@ -336,6 +466,10 @@ export default class TileEngine {
                         const localX = tileX - regionX * 8;
                         const localY = tileY - regionY * 8;
 
+                        if (this.config.focus && !this.config.tilesInFocus.has(`${regionX}_${regionY}_${localX}_${localY}`)) {
+                            continue;
+                        }
+
                         const tile = this.mapMaker.map[key]["tiles"][localY][localX];
 
                         if (this.config.alt) {
@@ -349,6 +483,10 @@ export default class TileEngine {
                             }
                         } else {
                             // paint/delete brush
+                            if (this.isAutotileMember(this.getTileAt(tileX, tileY))) {
+
+                                changedTiles.add(`${tileX}_${tileY}`);
+                            }
                             if ((this.config.erase || this.mouse.get("right"))) {
                                 this.mapMaker.map[key]["tiles"][localY][localX] = "";
                             } else {
@@ -373,8 +511,24 @@ export default class TileEngine {
                 }
             }
         }
+        const tilesToUpdate = new Set();
 
-        this.updateRegions()
+        for (const key of changedTiles) {
+            const [tileX, tileY] = key.split("_").map(Number);
+
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    tilesToUpdate.add(`${tileX + dx}_${tileY + dy}`);
+                }
+            }
+        }
+
+        for (const key of tilesToUpdate) {
+            const [tileX, tileY] = key.split("_").map(Number);
+            this.updateAutotile(tileX, tileY);
+        }
+
+        this.updateRegions();
         
     }
 
@@ -450,42 +604,95 @@ export default class TileEngine {
         event.consume()
     }
 
-    fill(type, x, y){
-        // flood fill starting at tile x,y with type, replacing all connected tiles of the same type,does not cross regions
-        const regionX = Math.floor(x / 8);
-        const regionY = Math.floor(y / 8);
-        const key = `${regionX}_${regionY}`;
-        if (!this.mapMaker.map[key]) return;
-        this.queueRegion(key, this.mapMaker.map[key]["tiles"]);
-        const localX = x % 8;
-        const localY = y % 8;
-        const targetType = this.mapMaker.map[key]["tiles"][localY][localX][0];
-        if (targetType === type && !this.config.alt) return;
-        const stack = [[localX, localY]];
-        let itterations = 0;
-        while (stack.length > 0 && itterations < 1000) {
-            itterations++;
-            const [cx, cy] = stack.pop();
-            if (cx < 0 || cx >= 8 || cy < 0 || cy >= 8) continue;
-            if (!this.config.alt){
-                if (this.mapMaker.map[key]["tiles"][cy][cx][0] !== targetType) continue;
-                this.mapMaker.map[key]["tiles"][cy][cx] = [type, ""];
-            }
-            if (this.config.alt) {
-                if (this.mapMaker.map[key]["tiles"][cy][cx][0] !== type) continue;
-                if (this.mapMaker.map[key]["tiles"][cy][cx][1] === "selected") continue;
-                if (this.mapMaker.map[key]["tiles"][cy][cx] === "") continue;
-                this.mapMaker.map[key]["tiles"][cy][cx][1] = "selected";
-            }
-            stack.push([cx + 1, cy]);
-            stack.push([cx - 1, cy]);
-            stack.push([cx, cy + 1]);
-            stack.push([cx, cy - 1]);
+    fill(type, x, y) {
+        const startRegionX = Math.floor(x / 8);
+        const startRegionY = Math.floor(y / 8);
+        const startKey = `${startRegionX}_${startRegionY}`;
+        const startRegion = this.mapMaker.map[startKey];
+        const startLocalX = ((x % 8) + 8) % 8;
+        const startLocalY = ((y % 8) + 8) % 8;
+        const startTile = startRegion?.tiles[startLocalY][startLocalX] ?? "";
+        const targetType = Array.isArray(startTile) ? startTile[0] : "";
+
+        if (
+            this.config.focus &&
+            !this.config.tilesInFocus.has(`${startRegionX}_${startRegionY}_${startLocalX}_${startLocalY}`)
+        ) {
+            return;
         }
 
-        this.updateRegions()
-        
+        if (targetType === type && !this.config.alt) return;
+
+        const stack = [[x, y]];
+        const queuedRegions = new Set();
+        const visited = new Set();
+        let iterations = 0;
+
+        while (stack.length > 0 && iterations < 10000) {
+            iterations++;
+
+            const [tileX, tileY] = stack.pop();
+            const regionX = Math.floor(tileX / 8);
+            const regionY = Math.floor(tileY / 8);
+            const localX = ((tileX % 8) + 8) % 8;
+            const localY = ((tileY % 8) + 8) % 8;
+            const regionKey = `${regionX}_${regionY}`;
+            const tileKey = `${regionKey}_${localX}_${localY}`;
+
+            if (visited.has(tileKey)) continue;
+            visited.add(tileKey);
+
+            if (!this.config.focus && regionKey !== startKey) continue;
+
+            if (
+                this.config.focus &&
+                !this.config.tilesInFocus.has(tileKey)
+            ) {
+                continue;
+            }
+
+            let region = this.mapMaker.map[regionKey];
+
+            if (!region) {
+                if (this.config.alt) continue;
+
+                region = {
+                    tiles: Array.from({ length: 8 }, () => Array(8).fill("")),
+                    data: {}
+                };
+                this.mapMaker.map[regionKey] = region;
+            }
+
+            if (!queuedRegions.has(regionKey)) {
+                this.queueRegion(regionKey, region.tiles);
+                queuedRegions.add(regionKey);
+            }
+
+            const tile = region.tiles[localY][localX];
+            const currentType = Array.isArray(tile) ? tile[0] : "";
+
+            if (!this.config.alt) {
+                if (currentType !== targetType) continue;
+                region.tiles[localY][localX] = [type, ""];
+            } else {
+                if (currentType !== type) continue;
+                if (Array.isArray(tile) && tile[1] === "selected") continue;
+                if (!Array.isArray(tile)) continue;
+
+                tile[1] = "selected";
+            }
+
+            stack.push([tileX + 1, tileY]);
+            stack.push([tileX - 1, tileY]);
+            stack.push([tileX, tileY + 1]);
+            stack.push([tileX, tileY - 1]);
+        }
+
+        this.updateRegions();
     }
+
+
+
 
     getMouseTile() {
         const worldPos = this.mapMaker.screenToWorld(this.mouse.x, this.mouse.y);
@@ -508,6 +715,73 @@ export default class TileEngine {
             localY,
             key: `${regionX}_${regionY}_${localX}_${localY}`
         };
+    }
+
+    /**
+     * Gets a tile from world tile coordinates.
+     */
+    getTileAt(tileX, tileY) {
+        if (tileX < 0 || tileY < 0) return "";
+
+        const regionX = Math.floor(tileX / 8);
+        const regionY = Math.floor(tileY / 8);
+        const localX = tileX - regionX * 8;
+        const localY = tileY - regionY * 8;
+
+        const region = this.mapMaker.map[`${regionX}_${regionY}`];
+
+        return region?.tiles?.[localY]?.[localX] ?? "";
+    }
+
+    /**
+     * Checks whether a tile belongs to the currently selected autotile set.
+     */
+    isAutotileMember(tile) {
+        if (!Array.isArray(tile)) return false;
+
+        const tileset = this.config.tilingset;
+        return !!tileset &&
+            Object.values(tileset).includes(tile[0]);
+    }
+
+    /**
+     * Calculates the quadrant autotile mask from neighboring tiles.
+     * Bits are ordered NW, NE, SE, SW.
+     * @param {number} tileX - World tile X coordinate.
+     * @param {number} tileY - World tile Y coordinate.
+     * @returns {string} Four-bit corner mask.
+     */
+    getAutotileMask(tileX, tileY) {
+        const connected = (x, y) => !this.isAutotileMember(this.getTileAt(tileX + x, tileY + y));
+
+        const nw = connected(0, -1) || connected(-1, 0) || connected(-1, -1);
+        const ne = connected(0, -1) || connected(1, 0) || connected(1, -1);
+        const se = connected(0, 1) || connected(1, 0) || connected(1, 1);
+        const sw = connected(0, 1) || connected(-1, 0) || connected(-1, 1);
+
+        return `${+nw}${+ne}${+sw}${+se}`;
+    }
+
+    /**
+     * Recalculates the visual variant of an autotile.
+     */
+    updateAutotile(tileX, tileY) {
+        const tile = this.getTileAt(tileX, tileY);
+
+        if (!this.isAutotileMember(tile)) return;
+
+        const variant = this.getAutotileMask(tileX, tileY);
+        const tileType = this.config.tilingset[variant];
+
+        if (tileType === undefined || tileType === "") return;
+
+        const regionX = Math.floor(tileX / 8);
+        const regionY = Math.floor(tileY / 8);
+        const localX = tileX - regionX * 8;
+        const localY = tileY - regionY * 8;
+        const regionKey = `${regionX}_${regionY}`;
+
+        this.mapMaker.map[regionKey].tiles[localY][localX][0] = tileType;
     }
 
     selectNoteTile() {
@@ -581,7 +855,7 @@ export default class TileEngine {
                 }
             },
             // cycle brush type right
-            "e": {
+            "h": {
                 action: () => {
                     const keys = Object.keys(this.mapMaker.images).filter(key => key !== "addTile");
                     const currentIndex = keys.indexOf(this.config.selectedTileType);
@@ -591,7 +865,7 @@ export default class TileEngine {
                 type: "tap"
             },
             // cycle brush type left
-            "q": {
+            "k": {
                 action: () => {
                     const keys = Object.keys(this.mapMaker.images).filter(key => key !== "addTile");
                     const currentIndex = keys.indexOf(this.config.selectedTileType);
@@ -748,6 +1022,9 @@ export default class TileEngine {
                         const localX = ((targetX % 8) + 8) % 8;
                         const localY = ((targetY % 8) + 8) % 8;
                         const key = `${regionX}_${regionY}`;
+                        if (this.config.focus && !this.config.tilesInFocus.has(`${regionX}_${regionY}_${localX}_${localY}`)) {
+                            continue;
+                        }
 
                         if (!this.mapMaker.map[key]) {
                             this.queueRegion(key, Array.from({ length: 8 }, () => Array(8).fill("")));
@@ -799,48 +1076,134 @@ export default class TileEngine {
                 },
                 type: "tap"
             },
-            // outline
             "o": {
                 action: () => {
+                    const selected = new Set();
+
                     for (const key in this.mapMaker.map) {
-                        const tiles = this.mapMaker.map[key]["tiles"];
-                        let changed = false;
+                        const [regionX, regionY] = key.split("_").map(Number);
+                        const tiles = this.mapMaker.map[key].tiles;
+
                         for (let row = 0; row < 8; row++) {
                             for (let col = 0; col < 8; col++) {
                                 const tile = tiles[row][col];
-                                if (tile === "" || tile[1] !== "selected") {
-                                    continue;
-                                }
-                                const neighbors = [
-                                    [row - 1, col],
-                                    [row + 1, col],
-                                    [row, col - 1],
-                                    [row, col + 1]
-                                ];
-                                let isEdge = false;
-                                for (const [nRow, nCol] of neighbors) {
-                                    if (nRow < 0 || nRow >= 8 || nCol < 0 || nCol >= 8) {
-                                        isEdge = true;
-                                        break;
-                                    }
-                                    const neighbor = tiles[nRow][nCol];
-                                    if (neighbor === "" || neighbor[1] !== "selected") {
-                                        isEdge = true;
-                                        break;
-                                    }
-                                }
-                                const newType = isEdge ? "wall" : "floor";
-                                if (tile[0] !== newType) {
-                                    if (!changed) {
-                                        this.queueRegion(key, tiles);
-                                        changed = true;
-                                    }
-                                    tile[0] = newType;
+
+                                if (tile !== "" && tile[1] === "selected") {
+                                    selected.add(`${regionX * 8 + col}_${regionY * 8 + row}`);
                                 }
                             }
                         }
                     }
-                    this.updateRegions()
+
+                    const changedRegions = new Set();
+
+                    for (const key of selected) {
+                        const [tileX, tileY] = key.split("_").map(Number);
+                        const regionX = Math.floor(tileX / 8);
+                        const regionY = Math.floor(tileY / 8);
+                        const regionKey = `${regionX}_${regionY}`;
+                        const tile = this.getTileAt(tileX, tileY);
+
+                        const neighbors = [
+                            `${tileX}_${tileY - 1}`,
+                            `${tileX + 1}_${tileY}`,
+                            `${tileX}_${tileY + 1}`,
+                            `${tileX - 1}_${tileY}`
+                        ];
+
+                        const isEdge = neighbors.some(pos => !selected.has(pos));
+                        const newType = isEdge ? "wall" : "floor";
+
+                        if (tile[0] === newType) continue;
+
+                        if (!changedRegions.has(regionKey)) {
+                            this.queueRegion(regionKey, this.mapMaker.map[regionKey].tiles);
+                            changedRegions.add(regionKey);
+                        }
+
+                        tile[0] = newType;
+                    }
+
+                    if (changedRegions.size) this.updateRegions();
+                },
+                type: "tap"
+            },
+
+            // Line
+            "l": {
+                action: () => {
+                    const points = [];
+
+                    for (const key in this.mapMaker.map) {
+                        const [regionX, regionY] = key.split("_").map(Number);
+                        const tiles = this.mapMaker.map[key].tiles;
+
+                        for (let row = 0; row < 8; row++) {
+                            for (let col = 0; col < 8; col++) {
+                                const tile = tiles[row][col];
+
+                                if (tile !== "" && tile[1] === "selected") {
+                                    points.push({ x: regionX * 8 + col, y: regionY * 8 + row });
+                                }
+                            }
+                        }
+                    }
+
+                    points.sort((a, b) => a.y - b.y || a.x - b.x);
+
+                    const changedRegions = new Set();
+
+                    const paintWall = (x, y) => {
+                        const regionX = Math.floor(x / 8);
+                        const regionY = Math.floor(y / 8);
+                        const col = x % 8;
+                        const row = y % 8;
+                        const regionKey = `${regionX}_${regionY}`;
+                        const tile = this.mapMaker.map[regionKey]?.tiles[row]?.[col];
+
+                        if (!tile || tile === "" || tile[0] === "wall") return;
+
+                        if (!changedRegions.has(regionKey)) {
+                            this.queueRegion(regionKey, this.mapMaker.map[regionKey].tiles);
+                            changedRegions.add(regionKey);
+                        }
+
+                        tile[0] = "wall";
+                    };
+
+                    const drawLine = (start, end) => {
+                        let x = start.x;
+                        let y = start.y;
+                        const dx = Math.abs(end.x - x);
+                        const dy = Math.abs(end.y - y);
+                        const sx = x < end.x ? 1 : -1;
+                        const sy = y < end.y ? 1 : -1;
+                        let error = dx - dy;
+
+                        while (true) {
+                            paintWall(x, y);
+
+                            if (x === end.x && y === end.y) break;
+
+                            const error2 = error * 2;
+
+                            if (error2 > -dy) {
+                                error -= dy;
+                                x += sx;
+                            }
+
+                            if (error2 < dx) {
+                                error += dx;
+                                y += sy;
+                            }
+                        }
+                    };
+
+                    for (let i = 0; i < points.length - 1; i++) {
+                        drawLine(points[i], points[i + 1]);
+                    }
+
+                    if (changedRegions.size) this.updateRegions();
                 },
                 type: "tap"
             },
@@ -880,9 +1243,334 @@ export default class TileEngine {
                     notes.classList.toggle("hide");
                 },
                 type: "tap"
-            }
+            },
+            // focus selection
+            
+            "m": {
+                action: () => {
+                    this.config.tilingset = undefined;
+                    const maskByPosition = [
+                        ["0001", "0010", "0000", "1001"],
+                        ["0100", "1000", "1111", "0110"],
+                        ["0011", "1010", "1110", "1101"],
+                        ["0101", "1100", "1011", "0111"]
+                    ];
+
+                    if (this.config.focus) {
+                        const focusTiles = [];
+                        const selectedTiles = [];
+
+                        for (const key in this.mapMaker.map) {
+                            const region = this.mapMaker.map[key];
+                            const [regionX, regionY] = key.split("_").map(Number);
+
+                            for (let row = 0; row < 8; row++) {
+                                for (let col = 0; col < 8; col++) {
+                                    const tile = region.tiles[row][col];
+                                    const x = regionX * 8 + col;
+                                    const y = regionY * 8 + row;
+                                    const focusKey = `${key}_${col}_${row}`;
+
+                                    if (this.config.tilesInFocus.has(focusKey)) {
+                                        focusTiles.push({ x, y });
+                                    }
+
+                                    if (Array.isArray(tile) && tile[1] === "selected") {
+                                        selectedTiles.push({ x, y, type: tile[0] });
+                                    }
+                                }
+                            }
+                        }
+
+                        if (focusTiles.length === 16) {
+                            const minX = Math.min(...focusTiles.map(tile => tile.x));
+                            const minY = Math.min(...focusTiles.map(tile => tile.y));
+                            const focusPositions = new Set(
+                                focusTiles.map(tile => `${tile.x - minX}_${tile.y - minY}`)
+                            );
+
+                            const isValidLayout = Array.from({ length: 4 }, (_, row) =>
+                                Array.from({ length: 4 }, (_, col) =>
+                                    focusPositions.has(`${col}_${row}`)
+                                ).every(Boolean)
+                            ).every(Boolean);
+
+                            if (isValidLayout) {
+                                const sourceTypes = {};
+
+                                for (const tile of selectedTiles) {
+                                    const localX = tile.x - minX;
+                                    const localY = tile.y - minY;
+
+                                    if (localX < 0 || localX > 3 || localY < 0 || localY > 3) continue;
+                                    if (!this.config.tilesInFocus.has(`${Math.floor(tile.x / 8)}_${Math.floor(tile.y / 8)}_${tile.x % 8}_${tile.y % 8}`)) continue;
+                                    
+                                    const mask = maskByPosition[localY][localX];
+                                    sourceTypes[mask] = tile.type;
+                                }
+
+                                const wallType = sourceTypes["1111"];
+                                const floorType = sourceTypes["0000"];
+
+                                if (wallType && floorType) {
+                                    const wall = this.getEditableImage(wallType);
+                                    const floor = this.getEditableImage(floorType);
+
+                                    if (wall && floor) {
+                                        const tileset = { ...sourceTypes };
+                                        const quadrants = [
+                                            { x: 0, y: 0, sourceX: 16, sourceY: 16, edges: ["bottom", "right"] },
+                                            { x: 16, y: 0, sourceX: 0, sourceY: 16, edges: ["bottom", "left"] },
+                                            { x: 0, y: 16, sourceX: 16, sourceY: 0, edges: ["top", "right"] },
+                                            { x: 16, y: 16, sourceX: 0, sourceY: 0, edges: ["top", "left"] }
+                                        ];
+
+                                        for (const mask of maskByPosition.flat()) {
+                                            const tileType = tileset[mask] ?? `tile_${crypto.randomUUID()}`;
+                                            const canvas = document.createElement("canvas");
+                                            canvas.width = 32;
+                                            canvas.height = 32;
+
+                                            const ctx = canvas.getContext("2d");
+                                            ctx.imageSmoothingEnabled = false;
+                                            ctx.drawImage(floor, 0, 0);
+
+                                            for (let i = 0; i < 4; i++) {
+                                                if (mask[i] !== "1") continue;
+
+                                                const quadrant = quadrants[i];
+
+                                                ctx.drawImage(
+                                                    wall,
+                                                    quadrant.x, quadrant.y,
+                                                    16, 16,
+                                                    quadrant.x, quadrant.y,
+                                                    16, 16
+                                                );
+                                            }
+                                            for (let i = 0; i < 4; i++) {
+                                                if (mask[i] !== "1") continue;
+
+                                                const quadrant = quadrants[i];
+                                                const row = Math.floor(i / 2);
+                                                const col = i % 2;
+
+                                                const copyEdge = (edge, sourceX, sourceY) => {
+                                                    if (edge === "top") {
+                                                        ctx.drawImage(wall, sourceX, sourceY, 16, 1, quadrant.x, quadrant.y, 16, 1);
+                                                    } else if (edge === "bottom") {
+                                                        ctx.drawImage(wall, sourceX, sourceY + 15, 16, 1, quadrant.x, quadrant.y + 15, 16, 1);
+                                                    } else if (edge === "left") {
+                                                        ctx.drawImage(wall, sourceX, sourceY, 1, 16, quadrant.x, quadrant.y, 1, 16);
+                                                    } else if (edge === "right") {
+                                                        ctx.drawImage(wall, sourceX + 15, sourceY, 1, 16, quadrant.x + 15, quadrant.y, 1, 16);
+                                                    }
+                                                };
+
+                                                const edges = [
+                                                    { name: "top", outer: row === 0, neighbor: i - 2 },
+                                                    { name: "bottom", outer: row === 1, neighbor: i + 2 },
+                                                    { name: "left", outer: col === 0, neighbor: i - 1 },
+                                                    { name: "right", outer: col === 1, neighbor: i + 1 }
+                                                ];
+
+                                                for (const edge of edges) {
+                                                    if (edge.outer) {
+                                                        copyEdge(edge.name, quadrant.x, quadrant.y);
+                                                    } else if (mask[edge.neighbor] === "0") {
+                                                        copyEdge(edge.name, quadrant.sourceX, quadrant.sourceY);
+                                                    }
+                                                }
+                                            }
+
+                                            this.mapMaker.images[tileType] = canvas;
+                                            tileset[mask] = tileType;
+                                        }
+
+                                        const tilesetId = crypto.randomUUID();
+                                        this.config.tilesets ??= {};
+                                        this.config.tilesets[tilesetId] = tileset;
+                                        this.config.tilingset = tileset;
+
+                                        for (let row = 0; row < 4; row++) {
+                                            for (let col = 0; col < 4; col++) {
+                                                const mask = maskByPosition[row][col];
+                                                const tileType = tileset[mask];
+
+                                                const worldX = minX + col;
+                                                const worldY = minY + row;
+
+                                                const regionX = Math.floor(worldX / 8);
+                                                const regionY = Math.floor(worldY / 8);
+                                                const localX = worldX % 8;
+                                                const localY = worldY % 8;
+                                                const regionKey = `${regionX}_${regionY}`;
+
+                                                const region = this.mapMaker.map[regionKey];
+
+                                                if (region) {
+                                                    region.tiles[localY][localX] = [tileType, ""];
+                                                }
+                                            }
+                                        }
+
+                                        this.updateToolbar();
+                                        alert("Autotile set generated!");
+                                    }
+                                }
+                            }
+                        }
+
+                        this.config.focus = false;
+                        this.config.tilesInFocus.clear();
+                        return;
+                    }
+
+                    if (!this.config.selectionExists) {
+                        this.config.focus = false;
+                        this.config.tilesInFocus.clear();
+                        return;
+                    }
+
+                    this.config.tilesInFocus = new Set();
+
+                    for (const key in this.mapMaker.map) {
+                        const region = this.mapMaker.map[key];
+
+                        for (let row = 0; row < 8; row++) {
+                            for (let col = 0; col < 8; col++) {
+                                const tile = region.tiles[row][col];
+
+                                if (Array.isArray(tile) && tile[1] === "selected") {
+                                    this.config.tilesInFocus.add(`${key}_${col}_${row}`);
+                                }
+                            }
+                        }
+                    }
+
+                    this.config.focus = this.config.tilesInFocus.size > 0;
+                },
+                type: "tap"
+            },
+
+
+            "/": {
+                action: () => {
+                    const sourceType = this.config.selectedTileType;
+                    const source = this.getEditableImage(sourceType);
+                    if (!source) return;
+
+                    const tileType = `tile_${crypto.randomUUID()}`;
+                    const canvas = document.createElement("canvas");
+                    canvas.width = 32;
+                    canvas.height = 32;
+
+                    const ctx = canvas.getContext("2d");
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.drawImage(source, 0, 0);
+
+                    this.mapMaker.images[tileType] = canvas;
+                    this.config.selectedTileType = tileType;
+
+                    this.updateToolbar();
+                },
+                type: "tap"
+            },
+            
+            "Backspace": {
+                action: () => {
+                    if (this.backspaceTimer) return;
+
+                    this.backspaceTimer = setTimeout(() => {
+                        this.backspaceTimer = null;
+
+                        const tileType = this.config.selectedTileType;
+
+                        if (!tileType || !this.mapMaker.images[tileType]) return;
+                        const tilesToDelete = new Set();
+                        const tilesetsToDelete = [];
+
+                        for (const [id, tileset] of Object.entries(this.config.tilesets ?? {})) {
+                            if (Object.values(tileset).includes(tileType)) {
+                                tilesetsToDelete.push(id);
+
+                                for (const [mask, type] of Object.entries(tileset)) {
+                                    if (mask !== "1111" && mask !== "0000") {
+                                        tilesToDelete.add(type);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (tilesetsToDelete.length === 0) tilesToDelete.add(tileType);
+                        
+
+                        for (const id of tilesetsToDelete) {
+                            delete this.config.tilesets[id];
+                        }
+
+                        for (const type of tilesToDelete) {
+                            delete this.mapMaker.images[type];
+                        }
+
+                        for (const key in this.mapMaker.map) {
+                            const region = this.mapMaker.map[key];
+
+                            for (let row = 0; row < 8; row++) {
+                                for (let col = 0; col < 8; col++) {
+                                    const tile = region.tiles[row][col];
+
+                                    if (Array.isArray(tile) && tilesToDelete.has(tile[0])) {
+                                        region.tiles[row][col] = "";
+                                    }
+                                }
+                            }
+                        }
+
+                        if (tilesetsToDelete.length > 0) {
+                            this.config.tilingset = {};
+                        }
+
+                        this.config.selectedTileType = null;
+                        this.updateToolbar();
+                        this.updateRegions();
+                    }, 1000);
+                },
+                "release-action": () => {
+                    if (this.backspaceTimer) {
+                        clearTimeout(this.backspaceTimer);
+                        this.backspaceTimer = null;
+                    }
+                },
+                type: "hold"
+            },
+
             
         };
+    }
+
+    getEditableImage(tileType) {
+        const image = this.mapMaker.images[tileType];
+
+        if (!image) {
+            return null;
+        }
+
+        if (image instanceof HTMLCanvasElement) {
+            return image;
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = 32;
+        canvas.height = 32;
+
+        const ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(image, 0, 0, 32, 32);
+
+        this.mapMaker.images[tileType] = canvas;
+
+        return canvas;
     }
 
     updateToolbar() {
@@ -909,9 +1597,23 @@ export default class TileEngine {
                     e.dataTransfer.setData("text/plain", tileType);
                 });
 
-                img.addEventListener("click", () => {
+                
+                img.addEventListener("click", (e) => {
                     this.config.selectedTileType = tileType;
+
+                    if (e.shiftKey) {
+                        for (const tileset of Object.values(this.config.tilesets ?? {})) {
+                            if (Object.values(tileset).includes(tileType)) {
+                                this.config.tilingset = tileset;
+                                alert("Selected tileset for editing!");
+                                break;
+                            }
+                        }
+                    }
+
+                    this.updateToolbar();
                 });
+
 
                 tileContainer.appendChild(img);
             }
@@ -926,6 +1628,12 @@ export default class TileEngine {
         for (const img of tileContainer.querySelectorAll(".tile")) {
             if (!this.mapMaker.images[img.id]) {
                 img.remove();
+            }
+        }
+        if (!this.config.selectedTileType) {
+            const secondTile = tileContainer.querySelector(".tile:nth-child(2)");
+            if (secondTile) {
+                this.config.selectedTileType = secondTile.id;
             }
         }
     }
@@ -1026,7 +1734,6 @@ export default class TileEngine {
         // update tile container 
         const tileContainer = document.getElementById('tileContainer');
         for (const tileType in this.mapMaker.images) {
-            // if a tile type is not a valid id under tileContainer, add it (img element with id of tile type)
             if (!document.getElementById(tileType)) {
                 const img = document.createElement('img');
                 if (this.mapMaker.images[tileType] instanceof HTMLCanvasElement) {
@@ -1041,9 +1748,21 @@ export default class TileEngine {
                     e.dataTransfer.setData('text/plain', tileType);
                 });
                 // add event listener for click to select tile type
-                img.addEventListener('click', () => {
+                img.addEventListener("click", (e) => {
                     this.config.selectedTileType = tileType;
+
+                    if (e.shiftKey) {
+                        for (const tileset of Object.values(this.config.tilesets ?? {})) {
+                            if (Object.values(tileset).includes(tileType)) {
+                                this.config.tilingset = tileset;
+                                break;
+                            }
+                        }
+                    }
+
+                    this.updateToolbar();
                 });
+
                 tileContainer.appendChild(img);
             }
             // if a tile type is not in this.images, remove it from tileContainer, as it's not an option

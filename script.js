@@ -1233,7 +1233,7 @@ class MapMaker extends App{
 		// update keymap
 		for (const key of this.activeKeys) {
 			if (this.keyMap[key] && !this.pausedKeys.has(key)) {
-				this.keyMap[key]["action"]();
+				if (this.keyMap[key]["action"]) this.keyMap[key]["action"]();
 			}
 			if (this.keyMap[key] && this.keyMap[key]["type"] === "tap") {
 				this.pausedKeys.add(key);
@@ -1299,6 +1299,8 @@ class MapMaker extends App{
 		// multiply camera velocity by 0.9 to slow down over time
 		this.camera.vx *= 0.9;
 		this.camera.vy *= 0.9;
+
+		this.camera.speed = 2/this.camera.zoom;
 	}
 	screenToCanvas(x, y) {
 		const rect = this.canvas.getBoundingClientRect();

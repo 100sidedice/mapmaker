@@ -74,6 +74,13 @@ export default class PixelEngine {
                 }
             }
         }
+        if (this.config.focus){
+            // darken everything except the focused tiles
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            this.ctx.fillRect(startRegionX * 32 * 8, startRegionY * 32 * 8, (endRegionX - startRegionX + 1) * 32 * 8, (endRegionY - startRegionY + 1) * 32 * 8);
+            this.focusRenderer()
+
+        }
         for (const pixel of this.mapMaker.pixelSelection) {
             const [x, y] = pixel.split("_").map(Number);
             if (x < startRegionX * 256 || x > (endRegionX + 1) * 256 ||
@@ -161,6 +168,108 @@ export default class PixelEngine {
         this.ctx.fillStyle = `rgba(0, 0, 0, ${alpha/3})`;
         this.ctx.fillRect(tileX, tileY, this.config.brushSize, this.config.brushSize);
     }
+    focusRenderer() {
+        this.ctx.imageSmoothingEnabled = false;
+
+        for (const key of this.config.tilesInFocus) {
+            const [regionX, regionY, col, row] = key.split('_').map(Number);
+            const regionKey = `${regionX}_${regionY}`;
+            const region = this.mapMaker.map[regionKey];
+
+            if (!region) continue;
+
+            const tile = region.tiles[row][col];
+            if (tile === "") continue;
+
+            const x = (regionX * 8 + col) * 32;
+            const y = (regionY * 8 + row) * 32;
+            const tileType = tile[0];
+            const img = this.mapMaker.images[tileType];
+
+            if (img) {
+                this.ctx.drawImage(img, x, y, 32, 32);
+            }
+        }
+
+		// Show the 4x4 autotile mask when exactly 16 tiles are focused.
+		if (this.config.tilesInFocus.size !== 16) return;
+
+		const focusedTiles = [...this.config.tilesInFocus].map(key => {
+			const [regionX, regionY, col, row] = key.split("_").map(Number);
+			return {
+				regionX,
+				regionY,
+				col,
+				row,
+				x: regionX * 8 + col,
+				y: regionY * 8 + row
+			};
+		});
+
+		const minX = Math.min(...focusedTiles.map(tile => tile.x));
+		const minY = Math.min(...focusedTiles.map(tile => tile.y));
+
+		// Ensure the focused tiles form a contiguous 4x4 region.
+		if (
+			Math.max(...focusedTiles.map(tile => tile.x)) !== minX + 3 ||
+			Math.max(...focusedTiles.map(tile => tile.y)) !== minY + 3 ||
+			new Set(focusedTiles.map(tile => `${tile.x}_${tile.y}`)).size !== 16
+		) {
+			return;
+		}
+
+		const maskByPosition = [
+			["0001", "0010", "0000", "1001"],
+			["0100", "1000", "1111", "0110"],
+			["0011", "1010", "1110", "1101"],
+			["0101", "1100", "1011", "0111"]
+		];
+
+		this.ctx.save();
+		this.ctx.font = "bold 14px monospace";
+		this.ctx.textAlign = "center";
+		this.ctx.textBaseline = "middle";
+
+		for (let row = 0; row < 4; row++) {
+            for (let col = 0; col < 4; col++) {
+                const tileX = minX + col;
+                const tileY = minY + row;
+                const x = tileX * 32;
+                const y = tileY * 32;
+                const mask = maskByPosition[row][col];
+
+                if (mask === "0000") continue;
+
+                this.ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+
+                if (mask[0] === "1") {
+                    this.ctx.fillRect(x, y, 16, 16);
+                }
+                if (mask[1] === "1") {
+                    this.ctx.fillRect(x + 16, y, 16, 16);
+                }
+                if (mask[2] === "1") {
+                    this.ctx.fillRect(x, y + 16, 16, 16);
+                }
+                if (mask[3] === "1") {
+                    this.ctx.fillRect(x + 16, y + 16, 16, 16);
+                }
+            }
+        }
+
+		this.ctx.restore();
+
+    }
+    isTileInFocus(tileX, tileY) {
+        if (!this.config.focus) return true;
+
+        const regionX = Math.floor(tileX / 8);
+        const regionY = Math.floor(tileY / 8);
+        const col = tileX % 8;
+        const row = tileY % 8;
+
+        return this.config.tilesInFocus.has(`${regionX}_${regionY}_${col}_${row}`);
+    }
 
     brush(pos, method = "click", startPixelX = null, startPixelY = null, endPixelX = null, endPixelY = null) {
         const worldPos = this.mapMaker.screenToWorld(pos.x, pos.y);
@@ -205,6 +314,7 @@ export default class PixelEngine {
                 for (let pixelX = startPixelX; pixelX <= endPixelX; pixelX++) {
                     const tileX = Math.floor(pixelX / 32);
                     const tileY = Math.floor(pixelY / 32);
+                    if (!this.isTileInFocus(tileX, tileY)) continue;
                     const regionX = Math.floor(tileX / 8);
                     const regionY = Math.floor(tileY / 8);
                     const tile = this.mapMaker.map[`${regionX}_${regionY}`]?.tiles[tileY % 8][tileX % 8];
@@ -231,6 +341,7 @@ export default class PixelEngine {
             for (let tileX = startTileX; tileX <= endTileX; tileX++) {
                 const regionX = Math.floor(tileX / 8);
                 const regionY = Math.floor(tileY / 8);
+                if (!this.isTileInFocus(tileX, tileY)) continue;
 
                 if (regionX < 0 || regionY < 0) {
                     continue;

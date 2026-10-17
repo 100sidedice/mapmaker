@@ -20,10 +20,16 @@ export default class RegionEngine {
         // Tile-scope rendering
         // for now it just renders all tiles. will eventrally use rasterized images.
         const bounds = this.mapMaker.getBounds();
-        const startRegionX = Math.min(0, Math.floor(bounds.left / (32 * 8)));
-        const endRegionX = Math.floor(bounds.right / (32 * 8));
-        const startRegionY = Math.min(0, Math.floor(bounds.top / (32 * 8)));
-        const endRegionY = Math.floor(bounds.bottom / (32 * 8));
+        let startRegionX = Math.floor(bounds.left / (32 * 8));
+        let endRegionX = Math.floor(bounds.right / (32 * 8));
+        let startRegionY = Math.floor(bounds.top / (32 * 8));
+        let endRegionY = Math.floor(bounds.bottom / (32 * 8));
+        if (!this.config.unlockNegativeRegions) {
+            startRegionX = Math.min(0,Math.floor(bounds.left / (32 * 8)));
+            endRegionX = Math.floor(bounds.right / (32 * 8));
+            startRegionY = Math.min(0,Math.floor(bounds.top / (32 * 8)));
+            endRegionY = Math.floor(bounds.bottom / (32 * 8));
+        }
         this.ctx.fillStyle = 'rgb(41, 70, 48)';
         this.ctx.fillRect(startRegionX * 32 * 8, startRegionY * 32 * 8, (endRegionX - startRegionX + 1) * 32 * 8, (endRegionY - startRegionY + 1) * 32 * 8);
         for (let regionX = startRegionX; regionX <= endRegionX; regionX++) {
@@ -70,6 +76,18 @@ export default class RegionEngine {
                 }
             }
         }
+        for (const pixel of this.mapMaker.pixelSelection) {
+            const [x, y] = pixel.split("_").map(Number);
+            if (x < startRegionX * 256 || x > (endRegionX + 1) * 256 ||
+                y < startRegionY * 256 || y > (endRegionY + 1) * 256) {
+                continue;
+            }
+            this.ctx.strokeStyle = "rgba(0, 255, 255, 0.55)";
+            this.ctx.lineWidth = 0.05;
+            this.ctx.strokeRect(x, y, 1, 1);
+            this.ctx.fillStyle = "rgba(0, 255, 255, 0.55)";
+            this.ctx.fillRect(x, y, 0.2, 0.2);
+        }
         // draw last picked tile with a yellow outline
         if (this.config.lastPickedRegion) {
             const { regionX, regionY} = this.config.lastPickedRegion;
@@ -83,10 +101,21 @@ export default class RegionEngine {
             for (let regionY = startRegionY; regionY <= endRegionY; regionY++) {
                 // if negative region, draw black
                 if (regionX < 0 || regionY < 0) {
-                    this.ctx.fillStyle = 'rgb(0, 28, 37)';
-                    this.ctx.strokeStyle = 'rgba(0, 0, 0, 0)';
-                    this.ctx.fillRect(regionX * 8 * 32-1, regionY * 8 * 32-1, 8 * 32+2, 8 * 32+2);
-                    continue;
+                    // if the region actually exists, unlock it and draw it, otherwise draw black
+                    if (this.mapMaker.map[`${regionX}_${regionY}`] && this.mapMaker.map[`${regionX}_${regionY}`]["tiles"]) {
+                        if (!this.config.unlockNegativeRegions) {
+                            alert("Congrats. you have broken into the negative regions.");
+                            alert("Warning: Negative regions are not supported by pixel & tile scope, they are only supported by region and space scope.")
+                        }
+                        this.config.unlockNegativeRegions = true;
+                    }
+
+                    if (!this.config.unlockNegativeRegions || (!this.mapMaker.map[`${regionX}_${regionY}`] || !this.mapMaker.map[`${regionX}_${regionY}`]["tiles"])) {
+                        this.ctx.fillStyle = 'rgb(0, 28, 37)';
+                        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0)';
+                        this.ctx.fillRect(regionX * 8 * 32-1, regionY * 8 * 32-1, 8 * 32+2, 8 * 32+2);
+                        continue;
+                    }
                 }else{
                     this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
                     this.ctx.lineWidth = 1;
@@ -237,9 +266,20 @@ export default class RegionEngine {
             const regionY = Math.floor(worldPos.y / 256);
 
             this.ctx.globalAlpha = 0.5;
-
-
+            
+            
             for (const region of this.mapMaker.clipboard.regions) {
+                // if region is negative and unlockNegativeRegions is false, skip it
+                if ((regionX + (region.x - this.mapMaker.clipboard.mouseRegion.x)) < 0 || (regionY + (region.y - this.mapMaker.clipboard.mouseRegion.y)) < 0) {
+                    if (!this.config.unlockNegativeRegions) {
+                        this.ctx.globalAlpha = 0.1;
+                    }
+                } else {
+                    if (this.ctx.globalAlpha !== 0.5) {
+                        this.ctx.globalAlpha = 0.5;
+                    }
+                }
+                
                 const drawX = regionX + (region.x - this.mapMaker.clipboard.mouseRegion.x);
                 const drawY = regionY + (region.y - this.mapMaker.clipboard.mouseRegion.y);
 
@@ -322,15 +362,19 @@ export default class RegionEngine {
                 }
             }
         }
-        startRegionX = Math.max(0, startRegionX);
-        startRegionY = Math.max(0, startRegionY);
+        if (!this.config.unlockNegativeRegions) {
+            startRegionX = Math.max(0, startRegionX);
+            startRegionY = Math.max(0, startRegionY);
+        }
         if (startRegionX > endRegionX || startRegionY > endRegionY) {
             return;
         }
-        
-        if (startRegionX < 0 || startRegionY < 0) {
-            return; // don't allow negative regions
+        if (!this.config.unlockNegativeRegions) {
+            if (startRegionX < 0 || startRegionY < 0) {
+                return; // don't allow negative regions
+            }
         }
+        
 
         for (let regionY = startRegionY; regionY <= endRegionY; regionY++) {
             for (let regionX = startRegionX; regionX <= endRegionX; regionX++) {
@@ -695,6 +739,11 @@ export default class RegionEngine {
                             (region.y - this.mapMaker.clipboard.mouseRegion.y);
 
                         const key = `${drawX}_${drawY}`;
+
+                        // skip negative regions if unlockNegativeRegions is false
+                        if (!this.config.unlockNegativeRegions && (drawX < 0 || drawY < 0)) {
+                            continue;
+                        }
 
                         if (!this.mapMaker.map[key]) {
                             this.mapMaker.map[key] = {

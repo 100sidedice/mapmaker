@@ -11,7 +11,6 @@ export default class SpaceEngine {
 		this.config = mapMaker.config;
 		this.ctx = mapMaker.ctx;
 		this.mouse = mapMaker.mouse;
-		this.clipboard = mapMaker.clipboard;
 		this.lastPicked = mapMaker.lastPicked;
 		this.config.alt = mapMaker.alt;
 	}
@@ -20,10 +19,17 @@ export default class SpaceEngine {
         // Tile-scope rendering
         // for now it just renders all tiles. will eventrally use rasterized images.
         const bounds = this.mapMaker.getBounds();
-        const startRegionX = Math.min(0, Math.floor(bounds.left / (32 * 8)));
-        const endRegionX = Math.floor(bounds.right / (32 * 8));
-        const startRegionY = Math.min(0, Math.floor(bounds.top / (32 * 8)));
-        const endRegionY = Math.floor(bounds.bottom / (32 * 8));
+        let startRegionX = Math.floor(bounds.left / (32 * 8));
+        let endRegionX = Math.floor(bounds.right / (32 * 8));
+        let startRegionY = Math.floor(bounds.top / (32 * 8));
+        let endRegionY = Math.floor(bounds.bottom / (32 * 8));
+        // if the bounds has a negative number, unlock the negative regions
+        if (!this.config.unlockNegativeRegions) {
+            startRegionX = Math.min(0,Math.floor(bounds.left / (32 * 8)));
+            endRegionX = Math.floor(bounds.right / (32 * 8));
+            startRegionY = Math.min(0,Math.floor(bounds.top / (32 * 8)));
+            endRegionY = Math.floor(bounds.bottom / (32 * 8));
+        }
         this.ctx.fillStyle = 'rgb(0, 0, 0)';
         this.ctx.fillRect(startRegionX * 32 * 8, startRegionY * 32 * 8, (endRegionX - startRegionX + 1) * 32 * 8, (endRegionY - startRegionY + 1) * 32 * 8);
         // add stars using a seeded random number generator
@@ -47,6 +53,16 @@ export default class SpaceEngine {
                 // if there is a region at this location, draw gray box
                 // draw if region is selected
                 const key = `${regionX}_${regionY}`;
+                // if the region actually exists, unlock it and draw it, otherwise draw black
+                if (regionX < 0 || regionY < 0) {
+                    if (this.mapMaker.map[`${regionX}_${regionY}`] && this.mapMaker.map[`${regionX}_${regionY}`]["tiles"]) {
+                        if (!this.config.unlockNegativeRegions) {
+                            alert("Congrats. you have broken into the negative regions.");
+                            alert("Warning: Negative regions are not supported by pixel & tile scope, they are only supported by region and space scope.")
+                        }
+                        this.config.unlockNegativeRegions = true;
+                    }
+                }
                 if (this.mapMaker.map[key]) {
                     const color = getSpaceColor(regionX * 8 * 32, regionY * 8 * 32)
                     this.ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
@@ -121,29 +137,33 @@ export default class SpaceEngine {
         }
 
         // draw clipboard preview
-        if (this.config.showPreview && this.clipboard?.regions) {
+        if (this.config.showPreview && this.mapMaker.clipboard?.regions) {
             const worldPos = this.mapMaker.screenToWorld(this.mouse.x, this.mouse.y);
             const regionX = Math.floor(worldPos.x / 256);
             const regionY = Math.floor(worldPos.y / 256);
 
             this.ctx.globalAlpha = 0.5;
-
-            for (const region of this.clipboard.regions) {
-                const drawX = regionX + (region.x - this.clipboard.mouseRegion.x);
-                const drawY = regionY + (region.y - this.clipboard.mouseRegion.y);
-
-                // draw the region's tiles
-                for (let row = 0; row < 8; row++) {
-                    for (let col = 0; col < 8; col++) {
-                        const tileType = region.tiles[row][col];
-                        if (tileType === "") continue;
-
-                        const img = this.mapMaker.images[tileType];
-                        if (img) {
-                            this.ctx.drawImage(img, (drawX * 8 + col) * 32, (drawY * 8 + row) * 32, 32, 32);
-                        }
+            
+            
+            for (const region of this.mapMaker.clipboard.regions) {
+                // if region is negative and unlockNegativeRegions is false, skip it
+                if ((regionX + (region.x - this.mapMaker.clipboard.mouseRegion.x)) < 0 || (regionY + (region.y - this.mapMaker.clipboard.mouseRegion.y)) < 0) {
+                    if (!this.config.unlockNegativeRegions) {
+                        this.ctx.globalAlpha = 0.1;
+                    }
+                } else {
+                    if (this.ctx.globalAlpha !== 0.5) {
+                        this.ctx.globalAlpha = 0.5;
                     }
                 }
+                
+                const drawX = regionX + (region.x - this.mapMaker.clipboard.mouseRegion.x);
+                const drawY = regionY + (region.y - this.mapMaker.clipboard.mouseRegion.y);
+
+                // draw the region with a semi-transparent color
+                const color = getSpaceColor(drawX * 8 * 32, drawY * 8 * 32)
+                this.ctx.fillStyle = color;
+                this.ctx.fillRect(drawX * 8 * 32, drawY * 8 * 32, 8 * 32, 8 * 32);
 
                 // draw region grid lines
                 this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
@@ -167,13 +187,13 @@ export default class SpaceEngine {
             const maxRegionX = Math.max(startRegionX, endRegionX);
             const minRegionY = Math.min(startRegionY, endRegionY);
             const maxRegionY = Math.max(startRegionY, endRegionY);
-            this.ctx.fillStyle = `rgba(0, 0, 0, ${alpha/3})`;
+            this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha/3})`;
             this.ctx.fillRect(minRegionX * 256, minRegionY * 256, (maxRegionX - minRegionX + 1) * 256, (maxRegionY - minRegionY + 1) * 256);
             return;
         }
         const tileX = Math.floor(worldPos.x / (32*8)) - Math.floor(this.config.brushSize / 2-0.1);
         const tileY = Math.floor(worldPos.y / (32*8)) - Math.floor(this.config.brushSize / 2-0.1);
-        this.ctx.fillStyle = `rgba(0, 0, 0, ${alpha/3})`;
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha/3})`;
         this.ctx.fillRect(tileX * (8*32), tileY * (8*32), 32 * 8 * this.config.brushSize, 32 * 8 * this.config.brushSize);
         // if lastSelectedGroup is set, put marker on the mouse
         if (this.config.lastPickedGroup) {
@@ -183,7 +203,7 @@ export default class SpaceEngine {
             this.ctx.fillRect(worldPos.x - 16, worldPos.y - 16, 32, 32);
         }
     }
-brush(pos, method="click", startRegionX=null, startRegionY=null, endRegionX=null, endRegionY=null){
+    brush(pos, method="click", startRegionX=null, startRegionY=null, endRegionX=null, endRegionY=null){
         const worldPos = this.mapMaker.screenToWorld(pos.x, pos.y);
         // wrapped so that later we can add in other tools if we want
         if (startRegionX === null || startRegionY === null || endRegionX === null || endRegionY === null) {
@@ -206,15 +226,19 @@ brush(pos, method="click", startRegionX=null, startRegionY=null, endRegionX=null
                 }
             }
         }
-        startRegionX = Math.max(0, startRegionX);
-        startRegionY = Math.max(0, startRegionY);
+        if (!this.config.unlockNegativeRegions) {
+            startRegionX = Math.max(0, startRegionX);
+            startRegionY = Math.max(0, startRegionY);
+        }
         if (startRegionX > endRegionX || startRegionY > endRegionY) {
             return;
         }
-        
-        if (startRegionX < 0 || startRegionY < 0) {
-            return; // don't allow negative regions
+        if (!this.config.unlockNegativeRegions) {
+            if (startRegionX < 0 || startRegionY < 0) {
+                return; // don't allow negative regions
+            }
         }
+        
 
         for (let regionY = startRegionY; regionY <= endRegionY; regionY++) {
             for (let regionX = startRegionX; regionX <= endRegionX; regionX++) {
@@ -229,7 +253,7 @@ brush(pos, method="click", startRegionX=null, startRegionY=null, endRegionX=null
                         }
                         continue;
                     }
-                    if (this.mouse.get("right")){
+                    if ((this.config.erase || this.mouse.get("right"))){
                         // remove the region from the group
                         if (this.mapMaker.map[key]["groups"] && this.mapMaker.map[key]["groups"][this.config.lastPickedGroup]){
                             delete this.mapMaker.map[key]["groups"][this.config.lastPickedGroup];
