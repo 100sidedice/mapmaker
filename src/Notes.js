@@ -58,11 +58,24 @@ export default class Notes {
         this.searchEngine = new SearchEngine(this.mapMaker);
         this.diceRoller = new DiceRoller();
         this.firebase = new FirebaseData();
+        this.mapMaker.firebase = this.firebase;
         this.mapMaker.notes.templates ??= [];
         this.noteHistory = new Map();
         this.historyApplying = false;
+        this.messages = []; // [{sender, message, timestamp}]
+        this.deviceId = this.getDeviceId();
     }
-
+    getDeviceId() {
+        const storedId = localStorage.getItem("deviceId");
+        if (storedId) {
+            return storedId;
+        }
+        else {
+            const newId = crypto.randomUUID();
+            localStorage.setItem("deviceId", newId);
+            return newId;
+        }
+    }
     async load(){
         const uploadId = new URLSearchParams(window.location.search).get("upload");
         if (uploadId) {
@@ -152,6 +165,19 @@ export default class Notes {
             document.getElementById("notesMain").classList.remove("hidden");
             document.getElementById("notes").style.height = "auto";
         }
+        this.loadMessages();
+    }
+    loadMessages(){
+        // attach to firebase.onDiff
+        // for now we just update the message board with the latest messages
+        this.firebase.onDiff((diff, sender) => {
+            // if we don't already have this message, add it to the messages array
+            if (!this.messages.some(msg => msg.hash === diff.hash)) {
+                this.messages.push(diff);
+                this.messages.sort((a, b) => a.timestamp - b.timestamp);
+            }
+            this.updateMessages();
+        });
     }
     saveCurrentNote() {
         const input = document.getElementById("noteInput");
@@ -2066,7 +2092,167 @@ export default class Notes {
                 });
                 uploadFieldset.appendChild(copyUploadButton);
             }
+            const heading1 = document.createElement("h3");
+            heading1.textContent = "Upload Notes";
+            heading1.style.textAlign = "center";
+            uploadDetails.appendChild(heading1);
+            addHr(uploadDetails);
             uploadDetails.appendChild(uploadFieldset);
+            
+            const heading2 = document.createElement("h3");
+            heading2.textContent = "Rooms";
+            heading2.style.textAlign = "center";
+            uploadDetails.appendChild(heading2);
+            addHr(uploadDetails);
+
+
+            // ok, webrtc time I think
+            const roomsFieldset = document.createElement("fieldset");
+            roomsFieldset.classList.add("one-column", "plain");
+            roomsFieldset.id = "note-browser-rooms";
+
+            // username
+            const usernameInput = document.createElement("textarea");
+            usernameInput.placeholder = "Username...";
+            usernameInput.classList.add("note-title");
+            usernameInput.id = "note-username-input";
+            roomsFieldset.appendChild(usernameInput);
+
+            const roomsInput = document.createElement("textarea");
+            roomsInput.classList.add("hide");
+            roomsInput.placeholder = "Room ID...";
+            roomsInput.classList.add("note-title");
+            roomsInput.id = "note-rooms-input";
+
+            // when we input a username, unhide the roomsInput
+            usernameInput.addEventListener("keydown", (event) => {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    if (!usernameInput.value.trim()) return;
+                    usernameInput.blur();
+                    roomsInput.classList.remove("hide");
+                }
+            });
+            // when we input a room id, we can join the room
+            
+            
+            roomsInput.addEventListener("keydown", async event => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+
+                const roomId = roomsInput.value.trim();
+                const username = usernameInput.value.trim();
+
+                if (!roomId || !username) return;
+
+                const firebase = this.firebase;
+                const roomNoteKey = `room_${roomId}`;
+                const time = Date.now();
+
+                firebase.activeRoomKey = roomNoteKey;
+                firebase.username = username;
+
+                try {
+                    const existingRoomData = await firebase.load(roomNoteKey);
+
+                    if (!existingRoomData) {
+                        firebase.isHost = true;
+
+                        await firebase.upload(roomNoteKey, {
+                            lastTime: time,
+                            host: username,
+                            players: {
+                                [username]: {
+                                    lastTime: time,
+                                    playerData: {}
+                                }
+                            }
+                        });
+
+                        firebase.heartbeat();
+                        firebase.listenForPlayers();
+
+                        console.log(`Created room ${roomId} as host: ${username}`);
+                        return;
+                    }
+
+                    if (username === existingRoomData.host) {
+                        throw new Error("That username is already the host.");
+                    }
+
+                    if (existingRoomData.players?.[username]) {
+                        throw new Error("That username is already in the room.");
+                    }
+
+                    firebase.isHost = false;
+
+                    await firebase.helpers.set(
+                        firebase.roomDataRef(
+                            `players/${encodeURIComponent(username)}`
+                        ),
+                        {
+                            lastTime: time,
+                            playerData: {}
+                        }
+                    );
+
+                    firebase.heartbeat();
+
+                    console.log(`Joining room ${roomId} as ${username}`);
+                    firebase.hostUsername = existingRoomData.host;
+                    await firebase.startRTC(existingRoomData.host);
+                } catch (error) {
+                    console.error("Failed to enter room:", error);
+                }
+                // blur
+                roomsInput.blur();
+            });
+            roomsFieldset.appendChild(roomsInput);
+
+            // we got to sendDiff and onDiff. we can try making a message board.
+            const heading3 = document.createElement("h3");
+            heading3.textContent = "Messages";
+            heading3.style.textAlign = "center";
+            roomsFieldset.appendChild(heading3);
+            addHr(roomsFieldset);
+            const messageBoard = document.createElement("table");
+            messageBoard.id = "note-browser-messages";
+            // if we're not in a room, hide the message board
+            if (!this.firebase.hasConnection()) {
+                //messageBoard.classList.add("hide");
+            }
+            this.updateMessages();
+            // send message box
+            const sendMessageArea = document.createElement("textarea");
+            sendMessageArea.placeholder = "Type a message...";
+            sendMessageArea.classList.add("note-title");
+            sendMessageArea.id = "note-send-message";
+            sendMessageArea.addEventListener("keydown", async event => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+
+                const message = sendMessageArea.value.trim();
+                const username = usernameInput.value.trim();
+                const roomId = roomsInput.value.trim();
+
+                if (!message || !username || !roomId) return;
+
+                try {
+                    await this.firebase.sendDiff({
+                        sender: username,
+                        message: message,
+                        timestamp: Date.now()
+                    });
+                    sendMessageArea.value = "";
+                } catch (error) {
+                    console.error("Failed to send message:", error);
+                }
+            });
+            roomsFieldset.appendChild(sendMessageArea);
+
+
+            uploadDetails.appendChild(roomsFieldset);
+            uploadDetails.appendChild(messageBoard);
             noteBrowser.appendChild(uploadDetails);
         }
 
@@ -2096,6 +2282,26 @@ export default class Notes {
         if (!this.mapMaker.uploadMode) {
             addHr(noteBrowser);
             createUploadSection.call(this);
+        }
+    }
+
+    updateMessages(){
+        const messageBoard = document.getElementById("note-browser-messages");
+        if (!messageBoard) return;
+        messageBoard.innerHTML = "";
+        for (const message of this.messages) {
+            const row = document.createElement("tr");
+            const senderCell = document.createElement("td");
+            senderCell.textContent = message.sender;
+            const messageCell = document.createElement("td");
+            messageCell.textContent = message.message;
+            const timestampCell = document.createElement("td");
+            const date = new Date(message.timestamp);
+            timestampCell.textContent = date.toLocaleString();
+            row.appendChild(senderCell);
+            row.appendChild(messageCell);
+            row.appendChild(timestampCell);
+            messageBoard.appendChild(row);
         }
     }
 
