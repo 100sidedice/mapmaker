@@ -7,24 +7,21 @@
         <link rel="stylesheet" href="tooltip.css">
         <link rel="stylesheet" href="style.css">
         <link rel="stylesheet" href="notes.css">   
+        <script src="src/global.js" type="module"></script>
     </head>
     <body>
         <canvas id="mapCanvas" width="800" height="600"></canvas>
         <!-- tile container -->
         <div id="buttonContainer">
-            <button id="saveButton">Save</button>
-            <button id="saveMapButton">Download Map</button>
-            <button id="saveJSONButton">Download JSON</button>
-            <button id="loadJSONButton">Load JSON</button>
-            <button id="Rasterize">Download image</button>
-            <button id="clearSave">Clear Save</button>
             <p style="display:none">Region type count: <span id="detailsBox">0</span></p>
             <p style="display:none">Max tiles: <span id="tilesBox">16</span></p>
         </div>
-        <fieldset id="tileContainer">
-            <legend>Tiles</legend>
-        </fieldset>
-        <aside id="instructions">
+        <!-- alerts container -->
+        <div id="alertContainer">
+            
+        </div>
+        
+        <aside id="instructions" class="hide">
             <details open>
                 <summary id="starter">Welcome!</summary>
                 <p>
@@ -362,7 +359,7 @@
                 </ul>
             </details>
         </aside>
-        <button id="close-instructions">Close Information</button>
+        <button id="close-instructions">Toolbar</button>
         <aside id="notes" class="">
             <header id="notesHeader">Notes</header>
             <main id="notesMain">
@@ -428,6 +425,9 @@
             <button id="brushSize" class="">Size</button>
             <button id="swap-tile" class="mobile-only">Swap</button>
             <span id="pixelStepStatus" class="hide" aria-live="polite"></span>
+        </fieldset>
+        <fieldset id="tileContainer">
+            
         </fieldset>
         <div id="overlay" class="hide"></div>
         <menu id="conformation" class="hide">

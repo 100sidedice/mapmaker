@@ -178,7 +178,6 @@ class MapMaker extends App{
 
 		this.loadKeymap();
 		this.loadMouse(true);
-		this.loadButtons();
 		await this.Notes.load();
 		this.rebuildRegionTypes();
 		this.PixelEngine.load(this);
@@ -187,15 +186,13 @@ class MapMaker extends App{
 		this.SpaceEngine.load(this);
 
 		initializeTooltips();
-		// add color slider to the config panel
-		const colorSliderContainer = document.getElementById("buttonContainer");
-		const [slider, event] = createColorSlider(colorSliderContainer, (color) => {
+		const [slider, event] = createColorSlider(null, (color) => {
 			if (this.zoomLevel === 1) {
 				this.config.annotate_color = color;
 			} else {
 				this.config.selectedColor = color;
 			}
-		}, false, this.config.selectedColor, "5rem", "3rem", false);
+		}, false, this.config.selectedColor, "100%", "3rem", false);
 		this.colorSliderEvent = event;
 		slider.id = "colorSlider";
 		if (this.zoomLevel === 1) {
@@ -365,15 +362,9 @@ class MapMaker extends App{
 	}
 
 	showPixelStepStatus() {
-		const status = document.getElementById("pixelStepStatus");
-		if (!status) return;
 		const mode = this.config.pixelColorMode[0].toUpperCase() + this.config.pixelColorMode.slice(1);
-		status.textContent = `${this.config.pixelStep}% - ${mode}`;
-		status.classList.remove("hide");
-		clearTimeout(this.pixelStepStatusTimeout);
-		this.pixelStepStatusTimeout = setTimeout(() => {
-			status.classList.add("hide");
-		}, 1000);
+		const text = `${this.config.pixelStep}% - ${mode}`;
+		showAlert(text, 2000);
 	}
 
 	updatePixelColorPicker(color) {
@@ -502,9 +493,138 @@ class MapMaker extends App{
 			}
 		});
 	}
-	loadButtons(){
+	loadButtons(container){
 		// save map button 
-		const saveMapButton = document.getElementById('saveMapButton');
+		// create new button element with id "saveMapButton" and text "Save Map"
+		
+
+		const saveButton = document.createElement('button');
+		saveButton.id = 'saveButton';
+		saveButton.textContent = 'Save';
+		container.appendChild(saveButton);
+		saveButton.addEventListener('click', () => {
+			this.saver.save(this.images);
+		});
+
+		const clearSaveButton = document.createElement('button');
+		clearSaveButton.id = 'clearSaveButton';
+		clearSaveButton.textContent = 'Clear Save';
+		container.appendChild(clearSaveButton);
+		clearSaveButton.addEventListener('click', () => {
+			const conformation = document.getElementById("conformation");
+			conformation.classList.remove("hide");
+			const confirmYes = document.getElementById("confirm-yes");
+			const confirmNo = document.getElementById("confirm-no");
+			const overlay = document.getElementById("overlay");
+			overlay.classList.remove("hide");
+			overlay.addEventListener("click", () => {
+				conformation.classList.add("hide");
+				overlay.classList.add("hide");
+			});
+			conformation.focus();
+			confirmYes.addEventListener("click", async () => {
+				await this.saver.clear();
+				window.location.reload();
+			});
+			confirmNo.addEventListener("click", () => {
+				conformation.classList.add("hide");
+				overlay.classList.add("hide");
+			});
+			conformation.addEventListener("blur", () => {
+				conformation.classList.add("hide");
+				this.mouse.pause("left", 0.5)
+				overlay.classList.add("hide");
+			});
+		});
+
+		// save json button
+		const saveJsonButton = document.createElement('button');
+		saveJsonButton.id = 'saveJsonButton';
+		saveJsonButton.textContent = 'Download save file';
+		container.appendChild(saveJsonButton);
+		saveJsonButton.addEventListener('click', () => {
+			const json = JSON.stringify({
+				map: this.map,
+				notes: this.notes,
+				camera: this.camera,
+				config: this.config,
+				zoomLevel: this.zoomLevel,
+				annotations: this.annotations,
+				markers: this.markers,
+				images: this.saver.serializeCustomImages(this.images)
+			});
+
+			const blob = new Blob([json], { type: 'application/json' });
+
+			const link = document.createElement('a');
+			link.href = URL.createObjectURL(blob);
+			link.download = 'map.json';
+			link.click();
+		});
+		// load json button
+		const loadJsonButton = document.createElement('button');
+		loadJsonButton.id = 'loadJSONButton';
+		loadJsonButton.textContent = 'Load save file';
+		container.appendChild(loadJsonButton);
+		loadJsonButton.addEventListener('click', () => {
+			const input = document.createElement('input');
+
+			input.type = 'file';
+			input.accept = '.json';
+
+			input.addEventListener('change', (e) => {
+				const file = e.target.files[0];
+
+				const reader = new FileReader();
+
+				reader.onload = async (e) => {
+					const save = JSON.parse(e.target.result);
+
+					if (save.map) this.map = save.map;
+					if (save.notes) this.notes = save.notes;
+					else this.notes = {};
+					if (save.camera) this.camera = save.camera;
+					if (save.config) this.config = save.config;
+					if (save.zoomLevel) this.zoomLevel = save.zoomLevel;
+					if (save.annotations) this.annotations = save.annotations;
+					if (save.markers) this.markers = save.markers;
+					else this.regionTypes = new Map();
+					await this.loadImages(save.images);
+					
+					// normalize old map formats
+					for (const key in this.map) {
+						for (let row = 0; row < 8; row++) {
+							for (let col = 0; col < 8; col++) {
+								const tile = this.map[key]["tiles"][row][col];
+								if (typeof tile === "string" && tile !== "") {
+									this.map[key]["tiles"][row][col] = [tile, ""];
+								}
+							}
+						}
+					}
+					console.log("Loaded map:", this.map);
+					console.log("Loaded notes:", this.notes);
+					this.rebuildRegionTypes();
+					this.draw();
+				};
+
+				reader.readAsText(file);
+			});
+
+			input.click();
+		});
+
+		const rasterizeButton = document.createElement('button');
+		rasterizeButton.id = "Rasterize";
+		rasterizeButton.textContent = "Download map (single-image)";
+		container.appendChild(rasterizeButton);
+		rasterizeButton.addEventListener("click", () => {
+			this.downloadMap();
+		});
+		const saveMapButton = document.createElement('button');
+		saveMapButton.id = 'saveMapButton';
+		saveMapButton.textContent = 'Download map (sliced)';
+		container.appendChild(saveMapButton);
 		saveMapButton.addEventListener('click', async () => {
 			const canvas_images = [];
 			for (const key in this.map) {
@@ -560,137 +680,59 @@ class MapMaker extends App{
 			}
 		});
 
-		const saveButton = document.getElementById('saveButton');
-		saveButton.addEventListener('click', () => {
-			this.saver.save(this.images);
-		});
-
-		const clearSaveButton = document.getElementById('clearSave');
-		clearSaveButton.addEventListener('click', () => {
-			const conformation = document.getElementById("conformation");
-			conformation.classList.remove("hide");
-			const confirmYes = document.getElementById("confirm-yes");
-			const confirmNo = document.getElementById("confirm-no");
-			const overlay = document.getElementById("overlay");
-			overlay.classList.remove("hide");
-			overlay.addEventListener("click", () => {
-				conformation.classList.add("hide");
-				overlay.classList.add("hide");
-			});
-			conformation.focus();
-			confirmYes.addEventListener("click", async () => {
-				await this.saver.clear();
-				window.location.reload();
-			});
-			confirmNo.addEventListener("click", () => {
-				conformation.classList.add("hide");
-				overlay.classList.add("hide");
-			});
-			conformation.addEventListener("blur", () => {
-				conformation.classList.add("hide");
-				this.mouse.pause("left", 0.5)
-				overlay.classList.add("hide");
-			});
-		});
-
-		// save json button
-		const saveJsonButton = document.getElementById('saveJSONButton');
-		saveJsonButton.addEventListener('click', () => {
-			const json = JSON.stringify({
-				map: this.map,
-				notes: this.notes,
-				camera: this.camera,
-				config: this.config,
-				zoomLevel: this.zoomLevel,
-				annotations: this.annotations,
-				markers: this.markers,
-				images: this.saver.serializeCustomImages(this.images)
-			});
-
-			const blob = new Blob([json], { type: 'application/json' });
-
-			const link = document.createElement('a');
-			link.href = URL.createObjectURL(blob);
-			link.download = 'map.json';
-			link.click();
-		});
-		// load json button
-		const loadJsonButton = document.getElementById('loadJSONButton');
-		loadJsonButton.addEventListener('click', () => {
-			const input = document.createElement('input');
-
-			input.type = 'file';
-			input.accept = '.json';
-
-			input.addEventListener('change', (e) => {
-				const file = e.target.files[0];
-
-				const reader = new FileReader();
-
-				reader.onload = async (e) => {
-					const save = JSON.parse(e.target.result);
-
-					if (save.map) this.map = save.map;
-					if (save.notes) this.notes = save.notes;
-					else this.notes = {};
-					if (save.camera) this.camera = save.camera;
-					if (save.config) this.config = save.config;
-					if (save.zoomLevel) this.zoomLevel = save.zoomLevel;
-					if (save.annotations) this.annotations = save.annotations;
-					if (save.markers) this.markers = save.markers;
-					else this.regionTypes = new Map();
-					await this.loadImages(save.images);
-					
-					// normalize old map formats
-					for (const key in this.map) {
-						for (let row = 0; row < 8; row++) {
-							for (let col = 0; col < 8; col++) {
-								const tile = this.map[key]["tiles"][row][col];
-								if (typeof tile === "string" && tile !== "") {
-									this.map[key]["tiles"][row][col] = [tile, ""];
-								}
-							}
-						}
-					}
-					console.log("Loaded map:", this.map);
-					console.log("Loaded notes:", this.notes);
-					this.rebuildRegionTypes();
-					this.draw();
-				};
-
-				reader.readAsText(file);
-			});
-
-			input.click();
-		});
-
-		const rasterizeButton = document.getElementById("Rasterize");
-		rasterizeButton.addEventListener("click", () => {
-			this.downloadMap();
-		});
-
 		const closeInstructionsButton = document.getElementById("close-instructions");
 		closeInstructionsButton.addEventListener("click", () => {
-			// if instructions are open, close them, change the button text to "Open Instructions"
+			// if instructions are open, close them, show toolbar
 			// toggle 'hide' class
 			const instructions = document.getElementById("instructions");
+			const toolbar = document.getElementById("toolbar");
 			if (!document.getElementById("tileContainer").checkVisibility()) {
 				if (instructions.classList.contains("hide")) {
 					document.getElementById("notesMain").classList.add("hidden");
 					document.getElementById("notes").style.height = "3rem";
 				}
 			}
-			instructions.classList.toggle("hide");
 			if (instructions.classList.contains("hide")) {
-				closeInstructionsButton.textContent = "Open Information";
+				instructions.classList.remove("hide");
+				if (!window.matchMedia("(max-width: 600px)").matches) {
+					toolbar.classList.add("hide");
+					document.body.style.gridTemplateColumns = "5fr 2fr 7fr 27rem";
+					document.getElementById("tileContainer").style.width = "40%";
+				}
 			} else {
-				closeInstructionsButton.textContent = "Close Information";
+				instructions.classList.add("hide");
+				if (!window.matchMedia("(max-width: 600px)").matches) {
+					toolbar.classList.remove("hide");
+					document.body.style.gridTemplateColumns = "2fr 2fr 7fr 27rem";
+					document.getElementById("tileContainer").style.width = "80%";
+				}
+			}
+			if (!window.matchMedia("(max-width: 600px)").matches) {
+				if (instructions.classList.contains("hide")) {
+					closeInstructionsButton.textContent = "Toolbar";
+				} else {
+					closeInstructionsButton.textContent = "Information";
+				}
+			} else {
+				if (instructions.classList.contains("hide")) {
+					closeInstructionsButton.textContent = "Info";
+				} else {
+					closeInstructionsButton.textContent = "Close";
+				}
 			}
 		});
 		if (window.matchMedia("(max-width: 600px)").matches) {
 			document.getElementById("instructions").classList.add("hide");
 			closeInstructionsButton.textContent = "Open Information";
 		}
+		return [
+			saveMapButton,
+			saveButton,
+			clearSaveButton,
+			saveJsonButton,
+			loadJsonButton,
+			rasterizeButton
+		];
 	}
 	draw(){
 		this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
@@ -851,7 +893,8 @@ class MapMaker extends App{
 			}
 			pickMarkerLocation((worldPos) => {
 				const id = `marker_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
-				this.markers.push({ x: worldPos.x, y: worldPos.y, color: this.config.selectedColor, note: id });
+				// create marker
+				this.markers.push({ x: worldPos.x, y: worldPos.y, color: this.config.selectedColor, id: id, note: id });
 				this.notes[id] = { text: "", color: this.config.selectedColor };
 				this.Notes.generateCatagories("Markers");
 			});

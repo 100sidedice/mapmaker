@@ -1,8 +1,8 @@
 export default class TileEngine {
     constructor(mapMaker) {
         this.mapMaker = mapMaker;
-
         this.queue = new Map(); // for rasterization of regions
+        this.time = 0;
     }
 
     load(mapMaker){
@@ -397,6 +397,9 @@ export default class TileEngine {
 
     brush(pos, method="click", startTileX=null, startTileY=null, endTileX=null, endTileY=null){
         const worldPos = this.mapMaker.screenToWorld(pos.x, pos.y);
+        if (this.markerClick(worldPos, false)){
+            return;
+        }
         // wrapped so that later we can add in other tools if we want
         if (startTileX === null || startTileY === null || endTileX === null || endTileY === null) {
             startTileX = Math.floor(worldPos.x / 32) - Math.floor(this.config.brushSize / 2 - 0.1);
@@ -798,6 +801,28 @@ export default class TileEngine {
             return this.mapMaker.notes[key] || null;
         }
     }
+    //gfdadsd
+    markerClick(worldPos,edit=true) {
+        let closestDistance = 16;
+        let selectedMarker = null;
+        for (const marker of this.mapMaker.markers) {
+            const distance = Math.hypot(marker.x - worldPos.x, marker.y - worldPos.y);
+            if (distance <= closestDistance) {
+                selectedMarker = marker;
+                closestDistance = distance;
+            }
+        }
+        if (selectedMarker) {
+            this.config.selectedMarker = this.mapMaker.markers.indexOf(selectedMarker);
+            this.config.markerMode = "edit";
+            this.mapMaker.Notes.gotoMarker(selectedMarker, edit);
+            return true;
+        }
+        this.config.selectedMarker = null;
+
+        return false;
+    }
+    
 
     loadKeymap(){
         this.mapMaker.keyMap = {
@@ -900,23 +925,10 @@ export default class TileEngine {
                     this.config.ctrl = false;
                     if (this.mouse.trackpadMode && this.mouse.trackpadScrollDistance >= 30) return;
                     const worldPos = this.mapMaker.screenToWorld(this.mouse.x, this.mouse.y);
-
-                    let closestDistance = 16;
-                    let selectedMarker = null;
-                    for (const marker of this.mapMaker.markers) {
-                        const distance = Math.hypot(marker.x - worldPos.x, marker.y - worldPos.y);
-                        if (distance <= closestDistance) {
-                            selectedMarker = marker;
-                            closestDistance = distance;
-                        }
-                    }
-                    if (selectedMarker) {
-                        this.config.selectedMarker = this.mapMaker.markers.indexOf(selectedMarker);
-                        this.config.markerMode = "edit";
-                        this.mapMaker.Notes.gotoMarker(selectedMarker);
+                    //gfdadsd
+                    if (this.markerClick(worldPos, true)){
                         return;
                     }
-                    this.config.selectedMarker = null;
                     
                     if (this.config.annotate) {
                         // goto annotation note.
@@ -969,6 +981,7 @@ export default class TileEngine {
                     this.config.selectedTileType = tile[0];
                     this.selectNoteTile();
                     this.config.lastPicked = { regionX, regionY, tileX: tileX % 8, tileY: tileY % 8 };
+                    this.scrollToSelectedTile();
                 },
                 type: "hold"
             },
@@ -1715,6 +1728,7 @@ export default class TileEngine {
     }
 
     update(){
+        this.time +=1;
         let selectionExists = false;
         for (const key in this.mapMaker.map) {
             for (let row = 0; row < 8; row++) {
@@ -1782,8 +1796,12 @@ export default class TileEngine {
                 }
             }
         }
-
-        
+    }
+    scrollToSelectedTile(){
+        const selectedTile = document.querySelector('#tileContainer .selected');
+        if (selectedTile) {
+            selectedTile.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+        }
     }
 
     queueRegion(key, tiles){

@@ -550,12 +550,31 @@ export default class Notes {
         }
 
     }
-
-    gotoMarker(marker) {
+    
+    gotoMarker(marker, edit=false) {
         const markerNote = this.mapMaker.notes[marker.note];
         const targetKey = markerNote?.goto;
-        if (!targetKey) {
-            this.goto(marker.note);
+        // if the marker does not have a goto, scroll to it in the note browser
+        
+        if (!targetKey || edit) {
+            // generate the catagories and scroll to the marker's note button
+            showElms(document.querySelector("#notes > main"), "section.area", "noteBrowser");
+            if (this.mapMaker.currentNoteKey) {
+                showElms(document.querySelector("#notes > main #mainNoteControls"), "button", "");
+            } else {
+                showElms(document.querySelector("#notes > main #mainNoteControls"), "button", "");
+            }
+            this.generateCatagories("Markers");
+            // find the button for this marker's note
+            const id = marker.id;
+            // get from cached markers
+            const markerButton = this.cached_markers?.[id];
+            // open it via click event
+            if (markerButton) {
+                markerButton.click();
+                // scroll 
+                markerButton.scrollIntoView({ behavior: "smooth", block: "center"});
+            }
             return;
         }
 
@@ -564,6 +583,8 @@ export default class Notes {
         );
         const targetIndex = targetMarkers.indexOf(marker);
         this.goto(targetKey, `${targetKey}-${targetIndex + 1}`, marker.note);
+
+
     }
 
     editTemplate(index) {
@@ -1756,7 +1777,7 @@ export default class Notes {
             markersFieldset.id = "note-browser-markers";
             markersFieldset.classList.add("one-column", "plain");
             markersDetails.appendChild(markersFieldset);
-
+            const elements = {}
             for (const marker of this.mapMaker.markers) {
                 const key = marker.note;
                 const note = this.mapMaker.notes[key] ||= {
@@ -1792,11 +1813,20 @@ export default class Notes {
                     previewContext.fill();
                     return canvas;
                 };
+                
                 const markerButton = document.createElement("button");
+                markerButton.style.width = "50%";
                 markerButton.appendChild(createMarkerPreview());
-                markerButton.style.width = "100%";
                 markerButton.style.marginTop = "0.5rem";
                 markerButton.style.backgroundColor = "#cba778";
+                // add marker name to button
+                const markerName = document.createElement("span");
+                markerName.textContent = note.text || "Marker";
+                markerName.style.display = "block";
+                markerName.style.fontSize = "0.8rem";
+                markerName.style.fontWeight = "bold";
+                markerName.style.textAlign = "center";
+                markerButton.appendChild(markerName);
                 this.markIgnoredNoteButton(markerButton, note);
                 addTooltip(markerButton, note.text || "Marker");
                 markersDetails.appendChild(markerButton);
@@ -1851,6 +1881,7 @@ export default class Notes {
                 gotoButton.addEventListener("click", () => {
                     if (note.goto) this.gotoMarker(marker);
                 });
+                
                 markerFieldset.appendChild(gotoButton);
 
                 const gotoTextArea = document.createElement("textarea");
@@ -1877,20 +1908,35 @@ export default class Notes {
                 });
                 markerFieldset.appendChild(deleteButton);
                 markersDetails.appendChild(markerFieldset);
-
+                
                 markerButton.addEventListener("click", () => {
                     if (markerFieldset.classList.contains("hide")) {
                         markerFieldset.classList.remove("hide");
-                        markerButton.replaceChildren(document.createTextNode("Close"));
+                        // span 2 columns
+                        const text = document.createTextNode("Close");
+                        markerButton.replaceChildren(text);
+                        markerButton.style.width = "100%";
                         removeTooltip(markerButton);
                         loadHandle(note.color || marker.color, false, false);
                     } else {
                         markerFieldset.classList.add("hide");
                         markerButton.replaceChildren(createMarkerPreview());
+                        markerButton.style.width = "50%";
+                        const markerName = document.createElement("span");
+                        markerName.textContent = note.text || "Marker";
+                        markerName.style.display = "block";
+                        markerName.style.fontSize = "0.8rem";
+                        markerName.style.fontWeight = "bold";
+                        markerName.style.textAlign = "center";
+                        markerButton.appendChild(markerName);
                         addTooltip(markerButton, note.text || "Marker");
                     }
                 });
+                // add button to elements with markers id
+                // add the button to the elements object with the key as the marker id
+                elements[marker.id] = markerButton;
             }
+            this.cached_markers = elements;
             noteBrowser.appendChild(markersDetails);
         }
 
@@ -2038,7 +2084,7 @@ export default class Notes {
             }
             uploadDetails.id = "Upload";
             const uploadSummary = document.createElement("summary");
-            uploadSummary.textContent = "Upload";
+            uploadSummary.textContent = "Internet";
             addTooltip(uploadSummary, "Upload notes to a server and share the link with others");
             uploadDetails.appendChild(uploadSummary);
             const uploadFieldset = document.createElement("fieldset");
@@ -2256,6 +2302,30 @@ export default class Notes {
             noteBrowser.appendChild(uploadDetails);
         }
 
+        function createSettingsSection(){
+            const settingsDetails = document.createElement("details");
+            if (openCatagories.includes("Settings")) {
+                settingsDetails.setAttribute("open", "");
+            }
+            settingsDetails.id = "Settings";
+            const settingsSummary = document.createElement("summary");
+            settingsSummary.textContent = "Settings";
+            addTooltip(settingsSummary, "Program settings");
+            settingsDetails.appendChild(settingsSummary);
+
+            // these buttons used to be in the base mapmaker class - just moving to notes for better organization.
+            const heading1 = document.createElement("h3");
+            heading1.textContent = "General";
+            settingsDetails.appendChild(heading1);
+            const buttons = this.mapMaker.loadButtons(settingsDetails);
+            buttons.forEach(button => {
+                button.classList.add("nav-note");
+                button.style.backgroundColor = "#d5c0a3";
+                button.style.width = "100%";
+            });
+            noteBrowser.appendChild(settingsDetails);
+        }
+
         createStandardCatagory.call(this,"Global","global_");
         addHr(noteBrowser);
         createStandardCatagory.call(this,"Character","character_");
@@ -2271,7 +2341,7 @@ export default class Notes {
             addHr(noteBrowser);
             getGroupNotesSection.call(this);
         }
-        if (!this.mapMaker.uploadMode) {
+        if (!this.mapMaker.uploadMode && Object.keys(this.mapMaker.notes).some(key => /^marker_/.test(key))) {
             addHr(noteBrowser);
             getMarkerNotesSection.call(this);
         }
@@ -2282,6 +2352,8 @@ export default class Notes {
         if (!this.mapMaker.uploadMode) {
             addHr(noteBrowser);
             createUploadSection.call(this);
+            addHr(noteBrowser);
+            createSettingsSection.call(this);
         }
     }
 
@@ -2610,7 +2682,12 @@ export function createColorSlider(container, onChange, alpha = false, initialCol
     });
 
     wrapper.append(canvas, handle, colorInput);
-	container.appendChild(wrapper);
+    // if container is null, append to body
+    if (!container) {
+        document.body.appendChild(wrapper);
+    } else {
+        container.appendChild(wrapper);
+    }
     setColorInput(initialColor);
 
 	/**

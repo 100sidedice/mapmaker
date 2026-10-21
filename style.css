@@ -8,8 +8,10 @@ canvas#mapCanvas {
 }
 
 .selected {
-    border: 0.2rem solid #0f0;
-    box-shadow: 0 0 1rem #0f0;
+    outline: 0.2rem solid #0f0;
+    box-shadow: inset0 0 1rem #0f0;
+    box-sizing: border-box;
+    z-index: 30;
 }
 #tileContainer {
     user-select: none;
@@ -22,6 +24,16 @@ canvas#mapCanvas {
     margin-top: 0.4rem;
     margin-left: 1rem;
     margin-right: 1rem;
+    padding:0px;
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    overflow-y: scroll;
+    height: 100%;
+}
+#tileContainer:hover {
+    height: max-content;
+    max-height: 33vh;
+    z-index: 1000;
 }
 * {
     touch-action: pan-x pan-y;
@@ -29,18 +41,30 @@ canvas#mapCanvas {
 body {
     margin: 0;
     display: grid;
-    grid-template-columns: 4fr 1fr 8fr 27rem;
-    grid-template-rows: 1fr 8fr 0.5fr;
+    grid-template-columns: 2fr 2fr 7fr 27rem;
+    grid-template-rows: 3rem 8fr 1fr;
     grid-template-areas: 
-    "sidebar sidebar toolbar notes"
-    "instructions content content notes"
-    "buttons buttons buttons notes";
+    "sidebar sidebar alert notes"
+    "toolbar . . notes"
+    "buttons picker . notes";
     height: var(--viewport-height, 100dvh);
     width: 100%;
     padding: 0;
     position: fixed;
     overscroll-behavior: none;
     background: #000;
+}
+#alertContainer {
+    grid-area: alert;
+    color: #000;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    font-family: Arial, Helvetica, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    pointer-events: none;
 }
 body.notes-fullscreen {
     grid-template-columns: 0.31fr 0.68fr 0.31fr;
@@ -58,17 +82,6 @@ html {
     height: var(--viewport-height, 100%);
     overscroll-behavior: none;
     position: fixed;
-}
-#buttonContainer {
-    display: flex;
-    grid-area: buttons;
-    bottom: 1rem;
-    left: 1rem;
-    gap: 1rem;
-    padding: 1rem;
-    z-index: 1;
-    overflow-x: scroll;
-    height: 3rem;
 }
 #saveButton {
     z-index: 2;
@@ -113,27 +126,24 @@ button:active {
     transform: scale(0.95);
 }
 #instructions {
-    grid-area: instructions;
+    grid-area: toolbar;
     z-index: 1;
     font-family: Arial, Helvetica, sans-serif;
     text-align: start;
     color: #ffffff;
     background: #2b2b2bBB;
     border: 0.2rem solid #676767;
-    margin: 1rem 1rem 0rem 1rem;
+    margin: 1rem 1rem 1rem 1rem;
     padding: 0.5rem;
     overflow-y: scroll;
-    height: calc(100% - 7rem);
+    height: 100%;
 }
 #close-instructions {
-    grid-area: instructions;
+    grid-area: buttons;
     pointer-events: all;
     z-index: 2;
-    width: calc(100% - 2rem);
-    height: 3rem;
-    align-self: end;
-    justify-self: center;
-    margin: 0 1rem 0rem 1rem;
+    width: auto;
+    margin: 0.5rem 1rem 1rem 1rem;
 }
 details summary{
     pointer-events: all;
@@ -171,8 +181,8 @@ ul {
     z-index: 2;
 }
 #conformation {
-    grid-area: content;
-    z-index: 3;
+    display: fixed;
+    z-index: 300;
     background: #99866e;
     border: 0.5rem solid #664c2e;
     padding: 0.5rem;
@@ -186,6 +196,7 @@ ul {
     gap: 1rem;
     align-self: center;
     color: #43301a;
+
 }
 #conformation h2 {
     margin: 0;
@@ -203,19 +214,20 @@ ul {
     background: #dbc09a;
 }
 #colorSlider{
-    width: 5rem;
-    height: 1.5rem;
+    width: 100%;
+    height: 3rem;
+    grid-area: picker;
 }
 
 #toolbar {
     grid-area: toolbar;
     display: flex;
+    flex-direction: column;
     flex-wrap: wrap;
     justify-content: start;
-    align-items: center;
     background: #181922;
     border: 0.2rem solid #bdbdbd;
-    margin: 0.5rem 1rem 0rem 1rem;
+    margin: 1.2rem 1rem 0rem 1rem;
     padding: 0.5rem;
     z-index: 1;
     gap: 0.5rem;
@@ -229,16 +241,20 @@ ul {
 }
 #toolbar legend {
     color: #d1d1d1;
+    background: #181922;
+    border: 0.2rem solid transparent;
+    border-image: linear-gradient(to bottom, #b9b9b9, #181922) 1;
 }
 #toolbar button {
     flex: 1;
-    height: 100%;
+    width: 100%;
     margin: 0rem;
     background: #232641;
     border: 0.2rem solid #677d97;
     border-radius: 0.25rem;
     color: #b9b9b9;
     cursor: pointer;
+    overflow: scroll;
     pointer-events: all;
 }
 #toolbar button:active {
@@ -348,16 +364,22 @@ span {
 
     #close-instructions {
         grid-area: info;
-        position: relative;
-        width: 100%;
-        height: 3.5rem;
         margin: 0;
-        justify-self: end;
-        z-index: 5;
     }
-
+    #alertContainer {
+        display: none;
+    }
     #toolbar {
         grid-area: toolbar;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: start;
+        align-items: center;
+        background: #181922;
+        border: 0.2rem solid #bdbdbd;
+        z-index: 1;
+        gap: 0.5rem;
+        padding-top: 0rem;
         box-sizing: border-box;
         min-width: 0;
         min-height: 0;
@@ -366,8 +388,8 @@ span {
         overflow-x: auto;
         overflow-y: hidden;
         white-space: nowrap;
+        width: 100%;
     }
-
     #toolbar legend {
         display: none;
     }
@@ -375,6 +397,7 @@ span {
     #toolbar button {
         flex: 0 0 auto;
         min-width: 5rem;
+        width: auto;
         height: 3.5rem;
     }
 

@@ -434,12 +434,6 @@ body[data-upload-mode="true"] .ignore {
     color: #685442;
 }
 
-/** Note browser */
-.selected {
-    border: 0.2rem solid #0f0;
-    box-shadow: 0 0 1rem #0f0;
-    z-index: 30;
-}
 nav {
     display: flex;
     flex-direction: column;
