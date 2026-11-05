@@ -43,7 +43,7 @@ export default class Saver {
 		this.saveHook();
 
 		const data = {
-			...this.saveFile,
+			...JSON.parse(JSON.stringify(this.saveFile)),
 			images: await this.serializeImages(images)
 		};
 

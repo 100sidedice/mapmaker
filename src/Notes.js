@@ -181,42 +181,47 @@ export default class Notes {
     }
     saveCurrentNote() {
         const input = document.getElementById("noteInput");
+        this.mapMaker.serverManager?.beginEdit();
 
-        if (Number.isInteger(this.editingTemplateIndex)) {
-            const template = this.mapMaker.notes.templates?.[this.editingTemplateIndex];
-            if (template) {
-                template.html = input.value;
-            }
-            return;
-        }
-
-        if (!this.mapMaker.currentNoteKey) return;
-
-        const text = getNoteEditorValue(input).trim();
-        const variableRegex = /<var\s+key=["']([^"']+)["']>([\s\S]*?)<\/var>/gi;
-        let match;
-
-        while ((match = variableRegex.exec(text)) !== null) {
-            const key = match[1].trim();
-
-            if (!key) {
-                continue;
+        try {
+            if (Number.isInteger(this.editingTemplateIndex)) {
+                const template = this.mapMaker.notes.templates?.[this.editingTemplateIndex];
+                if (template) {
+                    template.html = input.value;
+                }
+                return;
             }
 
-            this.mapMaker.notes[`var_${key}`] = match[2];
-        }
+            if (!this.mapMaker.currentNoteKey) return;
 
-        if (text === "") {
-            delete this.mapMaker.notes[this.mapMaker.currentNoteKey];
-            return;
-        }
-        if (!this.mapMaker.notes[this.mapMaker.currentNoteKey]) {
-            this.mapMaker.notes[this.mapMaker.currentNoteKey] = {
-                "color": "#ff000033",
-                "text": text
-            };
-        } else {
-            this.mapMaker.notes[this.mapMaker.currentNoteKey].text = text;
+            const text = getNoteEditorValue(input).trim();
+            const variableRegex = /<var\s+key=["']([^"']+)["']>([\s\S]*?)<\/var>/gi;
+            let match;
+
+            while ((match = variableRegex.exec(text)) !== null) {
+                const key = match[1].trim();
+
+                if (!key) {
+                    continue;
+                }
+
+                this.mapMaker.notes[`var_${key}`] = match[2];
+            }
+
+            if (text === "") {
+                delete this.mapMaker.notes[this.mapMaker.currentNoteKey];
+                return;
+            }
+            if (!this.mapMaker.notes[this.mapMaker.currentNoteKey]) {
+                this.mapMaker.notes[this.mapMaker.currentNoteKey] = {
+                    "color": "#ff000033",
+                    "text": text
+                };
+            } else {
+                this.mapMaker.notes[this.mapMaker.currentNoteKey].text = text;
+            }
+        } finally {
+            this.mapMaker.serverManager?.endEdit();
         }
     }
     isIgnoredNote(note) {
@@ -682,7 +687,12 @@ export default class Notes {
             ...localValues,
             ...localKeywords.values
         });
+
         this.parseNoteLayoutTags(noteText);
+        this.parseRollTables(noteText, {
+            ...localValues,
+            ...localKeywords.values
+        });
         this.parseNoteTextareas(noteText, note);
         this.parseDiceExpressions(noteText, {
             ...localValues,
@@ -835,6 +845,118 @@ export default class Notes {
             space.setAttribute("aria-hidden", "true");
             spaceTag.replaceWith(space);
         });
+    }
+
+    /**
+     * Adds a roll control to tables marked with the roll property.
+     *
+     * The first cell in each row contains an inclusive range such as
+     * "1,5", "13", or "15-20"; the second cell contains the effect.
+     *
+     * @param {HTMLElement} container
+     * @param {Object<string, number>} values
+     */
+    parseRollTables(container, values = {}) {
+        container.querySelectorAll("table[roll], table[data-roll]").forEach(table => {
+            const entries = [];
+            table.querySelectorAll("tr").forEach(row => {
+                const cells = row.querySelectorAll(":scope > th, :scope > td");
+                if (cells.length < 2) return;
+
+                const range = this.parseRollTableRange(cells[0].textContent);
+                if (!range) return;
+
+                entries.push({
+                    min: range.min,
+                    max: range.max,
+                    effect: cells[1].cloneNode(true)
+                });
+            });
+
+            if (!entries.length) {
+                console.error("Roll tables require rows with ranges and an effect cell.", table);
+                return;
+            }
+
+            const min = Math.min(...entries.map(entry => entry.min));
+            const max = Math.max(...entries.map(entry => entry.max));
+            const controls = document.createElement("div");
+            controls.className = "note-roll-table-controls";
+
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "note-roll-table-button";
+            button.textContent = `Roll (${min}-${max})`;
+
+            const result = document.createElement("output");
+            result.className = "note-roll-table-result";
+            result.setAttribute("aria-live", "polite");
+            result.textContent = "Roll to see an effect.";
+
+            button.addEventListener("click", () => {
+                const roll = Math.floor(Math.random() * (max - min + 1)) + min;
+                const entry = entries.find(option => roll >= option.min && roll <= option.max);
+
+                result.replaceChildren();
+                if (!entry) {
+                    controls.classList.remove("note-roll-table-controls-inline");
+                    result.textContent = `Rolled ${roll}: no effect found.`;
+                    return;
+                }
+
+                result.append(`Rolled ${roll}: `, entry.effect.cloneNode(true));
+                const displayedText = result.textContent.replace(/\s+/g, " ").trim();
+                const isInline = displayedText.length <= 30;
+                controls.classList.toggle(
+                    "note-roll-table-controls-inline",
+                    isInline
+                );
+                if (!isInline) {
+                    result.replaceChildren();
+                    result.append(`Rolled ${roll}: `);
+
+                    const hint = document.createElement("span");
+                    hint.className = "note-roll-table-effect-hint";
+                    hint.innerHTML = '<span style="color: #af8b74;">- [Hover to see effect]</span>';
+
+                    const effect = document.createElement("span");
+                    effect.className = "note-roll-table-effect";
+                    effect.appendChild(entry.effect.cloneNode(true));
+                    result.append(hint, effect);
+                }
+                this.parseRandomTags(result, values);
+                this.parseDiceExpressions(result, values);
+            });
+
+            controls.append(button, result);
+            table.insertAdjacentElement("afterend", controls);
+        });
+    }
+
+    /**
+     * Parses an inclusive roll range. Brackets are accepted for compatibility
+     * with older example syntax but are not required.
+     *
+     * @param {string} text
+     * @returns {{min: number, max: number}|null}
+     */
+    parseRollTableRange(text) {
+        const normalized = text.trim().replace(/^\[\s*|\s*\]$/g, "");
+        const match = normalized.match(/^(\d+)\s*(?:,\s*|\-\s*)(\d+)$/);
+        if (match) {
+            const first = Number(match[1]);
+            const second = Number(match[2]);
+            return {
+                min: Math.min(first, second),
+                max: Math.max(first, second)
+            };
+        }
+
+        const single = normalized.match(/^(\d+)$/);
+        if (!single) return null;
+
+        const value = Number(single[1]);
+        return { min: value, max: value };
     }
 
     /**
@@ -2156,6 +2278,45 @@ export default class Notes {
             const roomsFieldset = document.createElement("fieldset");
             roomsFieldset.classList.add("one-column", "plain");
             roomsFieldset.id = "note-browser-rooms";
+            const roomLog = document.createElement("pre");
+            roomLog.id = "note-room-log";
+            roomLog.title = "Click to copy room diagnostics";
+            roomLog.setAttribute("aria-live", "polite");
+            const logRoom = (message, error = false) => {
+                const timestamp = new Date().toLocaleTimeString();
+                roomLog.textContent += `[${timestamp}] ${message}\n`;
+                roomLog.scrollTop = roomLog.scrollHeight;
+                if (error) console.error(message);
+            };
+            roomLog.addEventListener("click", async () => {
+                try {
+                    if (navigator.clipboard?.writeText) {
+                        await navigator.clipboard.writeText(roomLog.textContent);
+                    } else {
+                        const selection = window.getSelection();
+                        const range = document.createRange();
+                        range.selectNodeContents(roomLog);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        document.execCommand("copy");
+                        selection.removeAllRanges();
+                    }
+                    logRoom("Diagnostics copied to clipboard.");
+                } catch (error) {
+                    logRoom(`Could not copy diagnostics: ${error.message}`, true);
+                }
+            });
+            this.firebase.onStatus(message => logRoom(message));
+            window.addEventListener("error", event => {
+                logRoom(`Browser error: ${event.message}`, true);
+            });
+            window.addEventListener("unhandledrejection", event => {
+                const reason = event.reason instanceof Error
+                    ? event.reason.message
+                    : String(event.reason);
+                logRoom(`Unhandled error: ${reason}`, true);
+            });
+            roomsFieldset.appendChild(roomLog);
 
             // username
             const usernameInput = document.createElement("textarea");
@@ -2170,90 +2331,161 @@ export default class Notes {
             roomsInput.classList.add("note-title");
             roomsInput.id = "note-rooms-input";
 
-            // when we input a username, unhide the roomsInput
-            usernameInput.addEventListener("keydown", (event) => {
-                if (event.key === "Enter") {
-                    event.preventDefault();
-                    if (!usernameInput.value.trim()) return;
-                    usernameInput.blur();
-                    roomsInput.classList.remove("hide");
+            roomsFieldset.appendChild(roomsInput);
+
+            const hostRoomButton = document.createElement("button");
+            hostRoomButton.textContent = "Host Room";
+            hostRoomButton.id = "note-host-room";
+            const joinRoomButton = document.createElement("button");
+            joinRoomButton.textContent = "Join Room";
+            joinRoomButton.id = "note-join-room";
+            const syncRoomButton = document.createElement("button");
+            syncRoomButton.textContent = "Sync";
+            syncRoomButton.id = "note-sync-room";
+            const deleteRoomButton = document.createElement("button");
+            deleteRoomButton.textContent = "Delete Room";
+            deleteRoomButton.id = "note-delete-room";
+            const leaveRoomButton = document.createElement("button");
+            leaveRoomButton.textContent = "Leave Room";
+            leaveRoomButton.id = "note-leave-room";
+            const roomButtons = [
+                hostRoomButton,
+                joinRoomButton,
+                syncRoomButton,
+                deleteRoomButton,
+                leaveRoomButton
+            ];
+            roomButtons.forEach(button => {
+                button.classList.add("hide", "room-control");
+                roomsFieldset.appendChild(button);
+            });
+
+            const updateRoomControls = (state) => {
+                roomButtons.forEach(button => button.classList.add("hide"));
+                if (state === "ready") {
+                    hostRoomButton.classList.remove("hide");
+                    joinRoomButton.classList.remove("hide");
+                } else if (state === "host") {
+                    syncRoomButton.classList.remove("hide");
+                    deleteRoomButton.classList.remove("hide");
+                } else if (state === "guest") {
+                    leaveRoomButton.classList.remove("hide");
+                }
+            };
+            usernameInput.addEventListener("input", () => {
+                const hasUsername = Boolean(usernameInput.value.trim());
+                roomsInput.classList.toggle("hide", !hasUsername);
+                if (hasUsername && !this.firebase.activeRoomKey) {
+                    updateRoomControls("ready");
                 }
             });
-            // when we input a room id, we can join the room
-            
-            
-            roomsInput.addEventListener("keydown", async event => {
-                if (event.key !== "Enter") return;
-                event.preventDefault();
 
+            const enterRoom = async (host) => {
                 const roomId = roomsInput.value.trim();
                 const username = usernameInput.value.trim();
-
                 if (!roomId || !username) return;
 
                 const firebase = this.firebase;
-                const roomNoteKey = `room_${roomId}`;
+                const roomKey = `room_${roomId}`;
                 const time = Date.now();
-
-                firebase.activeRoomKey = roomNoteKey;
-                firebase.username = username;
-
                 try {
-                    const existingRoomData = await firebase.load(roomNoteKey);
-
-                    if (!existingRoomData) {
+                    const existingRoomData = await firebase.load(roomKey);
+                    if (host) {
+                        if (existingRoomData) throw new Error("That room already exists.");
+                        firebase.activeRoomKey = roomKey;
+                        firebase.username = username;
                         firebase.isHost = true;
-
-                        await firebase.upload(roomNoteKey, {
+                        await firebase.helpers.set(firebase.roomRef(roomKey), {
                             lastTime: time,
                             host: username,
                             players: {
-                                [username]: {
-                                    lastTime: time,
-                                    playerData: {}
-                                }
+                                [username]: { lastTime: time, playerData: {} }
                             }
                         });
-
                         firebase.heartbeat();
                         firebase.listenForPlayers();
-
-                        console.log(`Created room ${roomId} as host: ${username}`);
-                        return;
-                    }
-
-                    if (username === existingRoomData.host) {
-                        throw new Error("That username is already the host.");
-                    }
-
-                    if (existingRoomData.players?.[username]) {
-                        throw new Error("That username is already in the room.");
-                    }
-
-                    firebase.isHost = false;
-
-                    await firebase.helpers.set(
-                        firebase.roomDataRef(
-                            `players/${encodeURIComponent(username)}`
-                        ),
-                        {
-                            lastTime: time,
-                            playerData: {}
+                        updateRoomControls("host");
+                        logRoom(`Hosted room "${roomId}" as ${username}.`);
+                    } else {
+                        if (!existingRoomData) throw new Error("That room does not exist.");
+                        if (username === existingRoomData.host) {
+                            throw new Error("That username is already the host.");
                         }
-                    );
-
-                    firebase.heartbeat();
-
-                    console.log(`Joining room ${roomId} as ${username}`);
-                    firebase.hostUsername = existingRoomData.host;
-                    await firebase.startRTC(existingRoomData.host);
+                        if (existingRoomData.players?.[username]) {
+                            throw new Error("That username is already in the room.");
+                        }
+                        firebase.activeRoomKey = roomKey;
+                        firebase.username = username;
+                        firebase.isHost = false;
+                        firebase.hostUsername = existingRoomData.host;
+                        await firebase.helpers.set(
+                            firebase.roomDataRef(`players/${encodeURIComponent(username)}`),
+                            { lastTime: time, playerData: {} }
+                        );
+                        firebase.heartbeat();
+                        await firebase.startRTC(existingRoomData.host);
+                        updateRoomControls("guest");
+                        logRoom(`Joined room "${roomId}" as ${username}.`);
+                    }
+                    roomsInput.blur();
                 } catch (error) {
-                    console.error("Failed to enter room:", error);
+                    logRoom(
+                        `Failed to ${host ? "host" : "join"} room: ${error.message}`,
+                        true
+                    );
                 }
-                // blur
-                roomsInput.blur();
+            };
+
+            hostRoomButton.addEventListener("click", () => enterRoom(true));
+            joinRoomButton.addEventListener("click", () => enterRoom(false));
+            syncRoomButton.addEventListener("click", async () => {
+                try {
+                    if (!this.mapMaker.serverManager) throw new Error("Sync is not ready.");
+                    const changed = await this.mapMaker.serverManager.sync();
+                    logRoom(changed ? "Sync sent over WebRTC." : "Nothing changed to sync.");
+                } catch (error) {
+                    logRoom(`Sync failed: ${error.message}`, true);
+                }
             });
-            roomsFieldset.appendChild(roomsInput);
+            deleteRoomButton.addEventListener("click", async () => {
+                if (!firebase.isHost || !firebase.activeRoomKey) return;
+                if (!confirm("Delete this room for everyone?")) return;
+                try {
+                    await firebase.remove(firebase.activeRoomKey);
+                    for (const username of firebase.rtcPeers.keys()) {
+                        firebase.closeRTC(username);
+                    }
+                    firebase.activeRoomKey = null;
+                    firebase.isHost = false;
+                    firebase.hostUsername = null;
+                    updateRoomControls("ready");
+                    logRoom("Room deleted.");
+                } catch (error) {
+                    logRoom(`Failed to delete room: ${error.message}`, true);
+                }
+            });
+            leaveRoomButton.addEventListener("click", async () => {
+                try {
+                    const roomKey = firebase.activeRoomKey;
+                    if (roomKey && firebase.username) {
+                        await firebase.helpers.removeValue(
+                            firebase.roomDataRef(
+                                `players/${encodeURIComponent(firebase.username)}`
+                            )
+                        );
+                    }
+                    for (const username of firebase.rtcPeers.keys()) {
+                        firebase.closeRTC(username);
+                    }
+                    firebase.activeRoomKey = null;
+                    firebase.isHost = false;
+                    firebase.hostUsername = null;
+                    updateRoomControls("ready");
+                    logRoom("Left room.");
+                } catch (error) {
+                    logRoom(`Failed to leave room: ${error.message}`, true);
+                }
+            });
 
             // we got to sendDiff and onDiff. we can try making a message board.
             const heading3 = document.createElement("h3");
@@ -2384,7 +2616,7 @@ export default class Notes {
         try {
             const notes = { ...this.mapMaker.notes };
             delete notes._upload;
-            await this.firebase.upload(id, notes);
+            await this.firebase.uploadNotes(id, notes);
 
             this.mapMaker.notes["_upload"] = { id };
             element.value = txt;

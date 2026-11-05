@@ -3,6 +3,7 @@ export default class TileEngine {
         this.mapMaker = mapMaker;
         this.queue = new Map(); // for rasterization of regions
         this.time = 0;
+        this.fillAnimationDuration = 15;
     }
 
     load(mapMaker){
@@ -13,6 +14,34 @@ export default class TileEngine {
         this.clipboard = mapMaker.clipboard;
         this.lastPicked = mapMaker.lastPicked;
         this.config.alt = mapMaker.alt;
+    }
+
+    setFillAnimationDuration(duration) {
+        if (!Number.isFinite(duration) || duration < 0) {
+            throw new Error("Fill animation duration must be a non-negative number.");
+        }
+        this.fillAnimationDuration = duration;
+    }
+
+    getFillAnimationBatchSize(index) {
+        return Math.max(1, Math.ceil(Math.exp(index / 8)));
+    }
+
+    pauseFillModifiers() {
+        this.mapMaker.fillAnimationActive = true;
+        for (const key of ["Alt", "Shift", "Control"]) {
+            this.mapMaker.pausedKeys.add(key);
+        }
+    }
+
+    resumeFillModifiers() {
+        this.mapMaker.fillAnimationActive = false;
+        this.config.alt = false;
+        this.config.shift = false;
+        this.config.ctrl = false;
+        for (const key of ["Alt", "Shift", "Control"]) {
+            this.mapMaker.pausedKeys.delete(key);
+        }
     }
 
     render(){
@@ -626,15 +655,15 @@ export default class TileEngine {
 
         if (targetType === type && !this.config.alt) return;
 
-        const stack = [[x, y]];
-        const queuedRegions = new Set();
+        const queue = [[x, y]];
         const visited = new Set();
+        const steps = [];
         let iterations = 0;
 
-        while (stack.length > 0 && iterations < 10000) {
+        while (queue.length > 0 && iterations < 10000) {
             iterations++;
 
-            const [tileX, tileY] = stack.pop();
+            const [tileX, tileY] = queue.shift();
             const regionX = Math.floor(tileX / 8);
             const regionY = Math.floor(tileY / 8);
             const localX = ((tileX % 8) + 8) % 8;
@@ -663,12 +692,6 @@ export default class TileEngine {
                     tiles: Array.from({ length: 8 }, () => Array(8).fill("")),
                     data: {}
                 };
-                this.mapMaker.map[regionKey] = region;
-            }
-
-            if (!queuedRegions.has(regionKey)) {
-                this.queueRegion(regionKey, region.tiles);
-                queuedRegions.add(regionKey);
             }
 
             const tile = region.tiles[localY][localX];
@@ -676,22 +699,51 @@ export default class TileEngine {
 
             if (!this.config.alt) {
                 if (currentType !== targetType) continue;
-                region.tiles[localY][localX] = [type, ""];
+                steps.push({ tileX, tileY, regionKey, region });
             } else {
                 if (currentType !== type) continue;
                 if (Array.isArray(tile) && tile[1] === "selected") continue;
                 if (!Array.isArray(tile)) continue;
 
-                tile[1] = "selected";
+                steps.push({ tileX, tileY, regionKey, region });
             }
 
-            stack.push([tileX + 1, tileY]);
-            stack.push([tileX - 1, tileY]);
-            stack.push([tileX, tileY + 1]);
-            stack.push([tileX, tileY - 1]);
+            queue.push([tileX + 1, tileY]);
+            queue.push([tileX - 1, tileY]);
+            queue.push([tileX, tileY + 1]);
+            queue.push([tileX, tileY - 1]);
         }
 
-        this.updateRegions();
+        this.mapMaker.captureUndoSnapshot();
+        this.pauseFillModifiers();
+        const applyStep = index => {
+            if (index >= steps.length) {
+                this.updateRegions();
+                this.mapMaker.serverManager?.endEdit();
+                this.resumeFillModifiers();
+                return;
+            }
+
+            const batchSize = this.getFillAnimationBatchSize(index);
+            const end = Math.min(index + batchSize, steps.length);
+            for (let step = index; step < end; step++) {
+                const { tileX, tileY, regionKey, region } = steps[step];
+                if (!this.mapMaker.map[regionKey]) {
+                    this.mapMaker.map[regionKey] = region;
+                }
+                const localX = ((tileX % 8) + 8) % 8;
+                const localY = ((tileY % 8) + 8) % 8;
+                this.queueRegion(regionKey, region.tiles);
+                if (this.config.alt) {
+                    region.tiles[localY][localX][1] = "selected";
+                } else {
+                    region.tiles[localY][localX] = [type, ""];
+                }
+            }
+            this.updateRegions();
+            setTimeout(() => applyStep(end), this.fillAnimationDuration);
+        };
+        applyStep(0);
     }
 
 
@@ -1660,6 +1712,12 @@ export default class TileEngine {
         this.mouse.hook("right-down", "tile-undo-snapshot", () => {
             this.mapMaker.captureUndoSnapshot();
         }, -300);
+        this.mouse.hook("left-up", "tile-finish-edit", () => {
+            this.mapMaker.serverManager?.endEdit();
+        }, 300);
+        this.mouse.hook("right-up", "tile-finish-edit", () => {
+            this.mapMaker.serverManager?.endEdit();
+        }, 300);
 
         this.mouse.hook("left-down", "tile-marker-select", (pos, event) => {
             if (!this.config.ctrl) return;

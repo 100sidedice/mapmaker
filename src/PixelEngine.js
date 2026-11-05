@@ -2,6 +2,7 @@ export default class PixelEngine {
     constructor(mapMaker) {
         this.mapMaker = mapMaker;
         this.queue = new Map();
+        this.fillAnimationDuration = 15;
     }
 
     load(mapMaker){
@@ -20,6 +21,34 @@ export default class PixelEngine {
                 this.addTile();
             });
         }   
+    }
+
+    setFillAnimationDuration(duration) {
+        if (!Number.isFinite(duration) || duration < 0) {
+            throw new Error("Fill animation duration must be a non-negative number.");
+        }
+        this.fillAnimationDuration = duration;
+    }
+
+    getFillAnimationBatchSize(index) {
+        return Math.max(1, Math.ceil(Math.exp(index / 8)));
+    }
+
+    pauseFillModifiers() {
+        this.mapMaker.fillAnimationActive = true;
+        for (const key of ["Alt", "Shift", "Control"]) {
+            this.mapMaker.pausedKeys.add(key);
+        }
+    }
+
+    resumeFillModifiers() {
+        this.mapMaker.fillAnimationActive = false;
+        this.config.alt = false;
+        this.config.shift = false;
+        this.config.ctrl = false;
+        for (const key of ["Alt", "Shift", "Control"]) {
+            this.mapMaker.pausedKeys.delete(key);
+        }
     }
 
     render(){
@@ -396,6 +425,9 @@ export default class PixelEngine {
         if (!image) {
             return null;
         }
+        if (this.mapMaker.serverManager?.editDepth) {
+            this.mapMaker.serverManager.markImageDirty(tileType);
+        }
 
         if (image instanceof HTMLCanvasElement) {
             return image;
@@ -543,11 +575,11 @@ export default class PixelEngine {
         };
 
         const visited = new Uint8Array(32 * 32);
-        const stack = [[startX, startY]];
-        const selection = [];
+        const queue = [[startX, startY]];
+        const steps = [];
 
-        while (stack.length) {
-            const [x, y] = stack.pop();
+        while (queue.length) {
+            const [x, y] = queue.shift();
             const index = y * 32 + x;
 
             if (visited[index]) continue;
@@ -555,17 +587,32 @@ export default class PixelEngine {
 
             if (!matches(x, y)) continue;
 
-            selection.push(
-                `${tileX * 32 + x}_${tileY * 32 + y}`
-            );
+            steps.push(`${tileX * 32 + x}_${tileY * 32 + y}`);
 
-            if (x > 0) stack.push([x - 1, y]);
-            if (x < 31) stack.push([x + 1, y]);
-            if (y > 0) stack.push([x, y - 1]);
-            if (y < 31) stack.push([x, y + 1]);
+            if (x > 0) queue.push([x - 1, y]);
+            if (x < 31) queue.push([x + 1, y]);
+            if (y > 0) queue.push([x, y - 1]);
+            if (y < 31) queue.push([x, y + 1]);
         }
 
-        this.mapMaker.pixelSelection = selection;
+        this.mapMaker.pixelSelection = [];
+        this.pauseFillModifiers();
+        const applyStep = index => {
+            if (index >= steps.length) {
+                this.resumeFillModifiers();
+                return;
+            }
+            const batchSize = this.getFillAnimationBatchSize(index);
+            const end = Math.min(index + batchSize, steps.length);
+            for (let step = index; step < end; step++) {
+                this.mapMaker.pixelSelection.push(steps[step]);
+            }
+            setTimeout(
+                () => applyStep(end),
+                this.fillAnimationDuration
+            );
+        };
+        applyStep(0);
     }
     loadKeymap(){
         this.mapMaker.keyMap = {
@@ -633,7 +680,6 @@ export default class PixelEngine {
                         this.fillSelectedPixels();
                         return;
                     }
-                    this.mapMaker.captureUndoSnapshot();
                     const pixel = this.getMousePixel();
                     const tileX = Math.floor(pixel.x / 32);
                     const tileY = Math.floor(pixel.y / 32);
@@ -650,8 +696,8 @@ export default class PixelEngine {
                     const image = this.getEditableImage(tile[0]);
                     if (!image) return;
 
-                    const pixelX = pixel.x % 32;
-                    const pixelY = pixel.y % 32;
+                    const pixelX = ((pixel.x % 32) + 32) % 32;
+                    const pixelY = ((pixel.y % 32) + 32) % 32;
                     const ctx = image.getContext("2d");
                     const imageData = ctx.getImageData(0, 0, 32, 32);
                     const data = imageData.data;
@@ -678,11 +724,18 @@ export default class PixelEngine {
                         return;
                     }
 
-                    const stack = [[pixelX, pixelY]];
+                    this.mapMaker.captureUndoSnapshot();
+                    this.mapMaker.serverManager?.markImageDirty(tile[0]);
+                    const queue = [[pixelX, pixelY]];
+                    const visited = new Uint8Array(32 * 32);
+                    const steps = [];
 
-                    while (stack.length) {
-                        const [x, y] = stack.pop();
+                    while (queue.length) {
+                        const [x, y] = queue.shift();
                         const index = (y * 32 + x) * 4;
+                        const visitedIndex = y * 32 + x;
+                        if (visited[visitedIndex]) continue;
+                        visited[visitedIndex] = 1;
 
                         if (
                             data[index] !== target[0] ||
@@ -693,20 +746,41 @@ export default class PixelEngine {
                             continue;
                         }
 
-                        data[index] = replacement[0];
-                        data[index + 1] = replacement[1];
-                        data[index + 2] = replacement[2];
-                        data[index + 3] = replacement[3];
+                        steps.push([x, y]);
 
-                        if (x > 0) stack.push([x - 1, y]);
-                        if (x < 31) stack.push([x + 1, y]);
-                        if (y > 0) stack.push([x, y - 1]);
-                        if (y < 31) stack.push([x, y + 1]);
+                        if (x > 0) queue.push([x - 1, y]);
+                        if (x < 31) queue.push([x + 1, y]);
+                        if (y > 0) queue.push([x, y - 1]);
+                        if (y < 31) queue.push([x, y + 1]);
                     }
 
-                    ctx.putImageData(imageData, 0, 0);
-                    this.queueRegion(key, region.tiles);
-                    this.updateRegions();
+                    const applyStep = stepIndex => {
+                        if (stepIndex >= steps.length) {
+                            this.queueRegion(key, region.tiles);
+                            this.updateRegions();
+                            this.mapMaker.serverManager?.endEdit();
+                            this.resumeFillModifiers();
+                            return;
+                        }
+                        const batchSize = this.getFillAnimationBatchSize(stepIndex);
+                        const end = Math.min(stepIndex + batchSize, steps.length);
+                        for (let step = stepIndex; step < end; step++) {
+                            const [x, y] = steps[step];
+                            const index = (y * 32 + x) * 4;
+                            data[index] = replacement[0];
+                            data[index + 1] = replacement[1];
+                            data[index + 2] = replacement[2];
+                            data[index + 3] = replacement[3];
+                        }
+                        ctx.putImageData(imageData, 0, 0);
+                        this.queueRegion(key, region.tiles);
+                        setTimeout(
+                            () => applyStep(end),
+                            this.fillAnimationDuration
+                        );
+                    };
+                    this.pauseFillModifiers();
+                    applyStep(0);
                 },
                 type: "tap"
             },
@@ -783,6 +857,7 @@ export default class PixelEngine {
                     }
                     this.mapMaker.pixelSelection.length = 0;
                     this.updateRegions();
+                    this.mapMaker.serverManager?.endEdit();
                 },
                 type: "tap"
             },
@@ -982,6 +1057,7 @@ export default class PixelEngine {
 
         this.updateToolbar();
         this.mapMaker.showPixelStepStatus();
+        this.mapMaker.serverManager?.endEdit();
     }
 
     selectSameColor() {
@@ -1098,21 +1174,38 @@ export default class PixelEngine {
             pixelsByImage.set(tile[0], coords);
         }
 
+        const steps = [];
         for (const [tileType, coords] of pixelsByImage) {
-            const image = this.getEditableImage(tileType);
-            if (!image) continue;
-
-            const ctx = image.getContext("2d");
-            ctx.fillStyle = this.config.selectedColor;
-
             for (const coordinate of coords) {
                 const [x, y] = coordinate.split("_").map(Number);
-                ctx.fillRect(x, y, 1, 1);
+                steps.push({ tileType, x, y });
             }
         }
 
-        this.updateToolbar();
-        this.mapMaker.showPixelStepStatus();
+        const applyStep = index => {
+            if (index >= steps.length) {
+                this.updateToolbar();
+                this.mapMaker.showPixelStepStatus();
+                this.mapMaker.serverManager?.endEdit();
+                this.resumeFillModifiers();
+                return;
+            }
+
+            const batchSize = this.getFillAnimationBatchSize(index);
+            const end = Math.min(index + batchSize, steps.length);
+            for (let step = index; step < end; step++) {
+                const { tileType, x, y } = steps[step];
+                const image = this.getEditableImage(tileType);
+                if (image) {
+                    const ctx = image.getContext("2d");
+                    ctx.fillStyle = this.config.selectedColor;
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+            setTimeout(() => applyStep(end), this.fillAnimationDuration);
+        };
+        this.pauseFillModifiers();
+        applyStep(0);
 
         return true;
     }
@@ -1207,6 +1300,7 @@ export default class PixelEngine {
             }
         }
         this.mapMaker.showPixelStepStatus();
+        this.mapMaker.serverManager?.endEdit();
     }
 
     adjustColor(color, mode, amount) {
@@ -1318,6 +1412,12 @@ export default class PixelEngine {
         this.mouse.hook("right-down", "pixel-undo-snapshot", () => {
             this.mapMaker.captureUndoSnapshot();
         }, -300);
+        this.mouse.hook("left-up", "pixel-finish-edit", () => {
+            this.mapMaker.serverManager?.endEdit();
+        }, 300);
+        this.mouse.hook("right-up", "pixel-finish-edit", () => {
+            this.mapMaker.serverManager?.endEdit();
+        }, 300);
         // preview for pasting clipboard
         this.mouse.hook("right-hold", "tile-clipboard-preview", (pos)=>{
             if (this.config.showPreview) {

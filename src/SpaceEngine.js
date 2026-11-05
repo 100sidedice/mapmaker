@@ -690,6 +690,19 @@ export default class SpaceEngine {
     loadMouse(mouse){
         this.mouse = mouse;
 
+        this.mouse.hook("left-down", "space-undo-snapshot", () => {
+            this.mapMaker.captureUndoSnapshot();
+        }, -300);
+        this.mouse.hook("right-down", "space-undo-snapshot", () => {
+            this.mapMaker.captureUndoSnapshot();
+        }, -300);
+        this.mouse.hook("left-up", "space-finish-edit", () => {
+            this.mapMaker.serverManager?.endEdit();
+        }, 300);
+        this.mouse.hook("right-up", "space-finish-edit", () => {
+            this.mapMaker.serverManager?.endEdit();
+        }, 300);
+
         // preview for pasting clipboard
         this.mouse.hook("right-hold", "region-clipboard-preview", (pos)=>{
             if (this.config.showPreview) {

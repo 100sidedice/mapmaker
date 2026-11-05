@@ -10,6 +10,7 @@ import { hashTiles } from './helpers.js';
 import Notes from './src/Notes.js';
 import { initializeTooltips } from './src/Tooltip.js';
 import { createColorSlider } from './src/Notes.js';
+import ServerManager from './src/firebase/ServerManager.js';
 
 class MapMaker extends App{
 	constructor() {
@@ -154,6 +155,7 @@ class MapMaker extends App{
 		this.regionTypes.set(this.defaultRegionHash, { count: 1, tiles: this.defaultRegion });
 
 		this.Notes = new Notes(this);
+		this.serverManager = null;
 	}
 	async load() {
 		const save = await this.saver.load();
@@ -179,6 +181,7 @@ class MapMaker extends App{
 		this.loadKeymap();
 		this.loadMouse(true);
 		await this.Notes.load();
+		this.serverManager = new ServerManager(this, this.firebase);
 		this.rebuildRegionTypes();
 		this.PixelEngine.load(this);
 		this.TileEngine.load(this);
@@ -260,6 +263,12 @@ class MapMaker extends App{
 		window.addEventListener("keydown", (event) => {
 			if (this.inputContext !== "canvas") return;
 			event.preventDefault();
+			if (
+				this.fillAnimationActive &&
+				["Alt", "Shift", "Control"].includes(event.key)
+			) {
+				return;
+			}
 			if (this.keyMap[event.key]) {
 				this.activeKeys.add(event.key);
 			}
@@ -267,7 +276,10 @@ class MapMaker extends App{
 
 		window.addEventListener("keyup", (event) => {
 			if (this.inputContext !== "canvas") return;
-			if (this.keyMap[event.key]?.["release-action"]) {
+			if (
+				!this.fillAnimationActive &&
+				this.keyMap[event.key]?.["release-action"]
+			) {
 				this.keyMap[event.key]["release-action"]();
 			}
 			this.activeKeys.delete(event.key);
@@ -339,6 +351,7 @@ class MapMaker extends App{
 	}
 
 	captureUndoSnapshot() {
+		this.serverManager?.beginEdit();
 		const images = {};
 		for (const [tileType, image] of Object.entries(this.images)) {
 			if (!(image instanceof HTMLCanvasElement)) continue;
@@ -382,10 +395,13 @@ class MapMaker extends App{
 	undo() {
 		const snapshot = this.undoHistory.pop();
 		if (!snapshot) return false;
+		this.serverManager?.beginEdit();
 
 		this.map = snapshot.map;
 		this.annotations = snapshot.annotations;
 		this.pixelSelection = snapshot.pixelSelection || [];
+		this.serverManager?.trackRoot("regions", "map");
+		this.serverManager?.trackRoot("annotations", "annotations");
 		for (const [tileType, imageData] of Object.entries(snapshot.images || {})) {
 			const image = this.images[tileType];
 			if (!(image instanceof HTMLCanvasElement)) continue;
@@ -405,6 +421,7 @@ class MapMaker extends App{
 			this.PixelEngine.queue.clear();
 			this.PixelEngine.updateRegions();
 		}
+		this.serverManager?.endEdit();
 		return true;
 	}
 	
@@ -502,8 +519,13 @@ class MapMaker extends App{
 		saveButton.id = 'saveButton';
 		saveButton.textContent = 'Save';
 		container.appendChild(saveButton);
-		saveButton.addEventListener('click', () => {
-			this.saver.save(this.images);
+		saveButton.addEventListener('click', async () => {
+			try {
+				await this.saver.save(this.images);
+			} catch (error) {
+				console.error("Failed to save MapMaker state.", error);
+				alert(`Failed to save MapMaker state.\n\n${error.message}`);
+			}
 		});
 
 		const clearSaveButton = document.createElement('button');
@@ -759,6 +781,7 @@ class MapMaker extends App{
 		if (this.zoomLevel === 3) {
 			this.SpaceEngine.render();
 		}
+		this.serverManager?.renderCursors(this.ctx);
 	}
 	createToolbar(){
 		const toolbar = document.getElementById("toolbar");

@@ -868,6 +868,12 @@ export default class RegionEngine {
         this.mouse.hook("right-down", "region-undo-snapshot", () => {
             this.mapMaker.captureUndoSnapshot();
         }, -300);
+        this.mouse.hook("left-up", "region-finish-edit", () => {
+            this.mapMaker.serverManager?.endEdit();
+        }, 300);
+        this.mouse.hook("right-up", "region-finish-edit", () => {
+            this.mapMaker.serverManager?.endEdit();
+        }, 300);
 
         this.mouse.hook("left-down", "marker-select", (pos, event) => {
             if (!this.config.ctrl) return;

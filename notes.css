@@ -326,6 +326,79 @@ section.area {
 	    background-color: #88550022;
 	}
 }
+.note-roll-table-controls {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.note-roll-table-controls-inline {
+    display: inline-flex;
+    vertical-align: middle;
+}
+
+#noteDisplay .note-roll-table-button {
+    flex: 0 0 auto;
+}
+
+.note-roll-table-result {
+    flex: 1;
+    min-width: 0;
+    height: 1.5rem;
+    overflow: hidden;
+    padding: 0.4rem 0.5rem;
+    border: 0.15rem solid #664c2e;
+    border-radius: 0.25rem;
+    background: #fff8eb;
+    color: #332416;
+}
+
+.note-roll-table-controls-inline .note-roll-table-result {
+    flex: 0 0 auto;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    white-space: nowrap;
+}
+
+.note-roll-table-controls-inline .note-roll-table-result > * {
+    display: inline;
+}
+
+.note-roll-table-controls-inline {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
+.note-roll-table-effect {
+    display: none;
+}
+
+.note-roll-table-result:hover .note-roll-table-effect,
+.note-roll-table-result:focus .note-roll-table-effect {
+    display: inline;
+}
+
+.note-roll-table-result:hover .note-roll-table-effect::before,
+.note-roll-table-result:focus .note-roll-table-effect::before {
+    content: "";
+    display: block;
+    margin: 0.35rem 0;
+    border-top: 0.1rem solid #664c2e;
+}
+
+.note-roll-table-result:hover .note-roll-table-effect-hint,
+.note-roll-table-result:focus .note-roll-table-effect-hint {
+    display: none;
+}
+
+.note-roll-table-result:hover,
+.note-roll-table-result:focus {
+    height: auto;
+    min-height: 2.4rem;
+    overflow: visible;
+}
 body[data-upload-mode="true"] .ignore {
     display: none !important;
 }

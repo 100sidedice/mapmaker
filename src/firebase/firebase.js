@@ -78,6 +78,11 @@ export default class LobbyManager {
         this.activeRoomKey = null;
         this.isHost = false;
         this.diffListeners = [];
+        this.syncListeners = [];
+        this.syncRequestListeners = [];
+        this.statusListeners = [];
+        this.cursorListeners = [];
+        this.seenSyncIds = new Set();
         this.hostUsername = null;
 
         this.rtcConfig = {
@@ -92,15 +97,23 @@ export default class LobbyManager {
         this.helpers = { set, ref, removeValue, push, onValue, onChildAdded, db };
     }
 
-    async upload(id, data) {
+    async uploadNotes(id, notes) {
+        if (!id.startsWith("_upload")) {
+            throw new Error("Note uploads must use an id starting with _upload.");
+        }
+
         await set(dataRef(id), {
             _mapmakerUploadFormat: UPLOAD_FORMAT_VERSION,
-            data: encodeUploadData(data)
+            data: encodeUploadData(notes)
         });
     }
 
     async remove(id) {
         await removeValue(dataRef(id));
+    }
+
+    roomRef(roomKey) {
+        return dataRef(roomKey);
     }
 
     async load(id) {
@@ -294,8 +307,17 @@ export default class LobbyManager {
         });
     }
     setupRTCChannel(remoteUsername, channel) {
-        channel.onopen = () => console.log(`Connected to ${remoteUsername}`);
-        channel.onclose = () => console.log(`Disconnected from ${remoteUsername}`);
+        channel.onopen = () => {
+            console.log(`Connected to ${remoteUsername}`);
+            this.reportStatus(`WebRTC connected to ${remoteUsername}.`);
+            if (!this.isHost) {
+                this.sendRTC(remoteUsername, { type: "sync-request" });
+            }
+        };
+        channel.onclose = () => {
+            console.log(`Disconnected from ${remoteUsername}`);
+            this.reportStatus(`WebRTC disconnected from ${remoteUsername}.`);
+        };
         channel.onmessage = event => {
             try {
                 const message = JSON.parse(event.data);
@@ -330,6 +352,78 @@ export default class LobbyManager {
                 listener => listener !== callback
             );
         };
+    }
+
+    onSync(callback) {
+        this.syncListeners.push(callback);
+
+        return () => {
+            this.syncListeners = this.syncListeners.filter(
+                listener => listener !== callback
+            );
+        };
+    }
+
+    onSyncRequest(callback) {
+        this.syncRequestListeners.push(callback);
+        return () => {
+            this.syncRequestListeners = this.syncRequestListeners.filter(
+                listener => listener !== callback
+            );
+        };
+    }
+
+    onStatus(callback) {
+        this.statusListeners.push(callback);
+        return () => {
+            this.statusListeners = this.statusListeners.filter(
+                listener => listener !== callback
+            );
+        };
+    }
+
+    onCursor(callback) {
+        this.cursorListeners.push(callback);
+        return () => {
+            this.cursorListeners = this.cursorListeners.filter(
+                listener => listener !== callback
+            );
+        };
+    }
+
+    sendCursor(cursor) {
+        if (!this.activeRoomKey || !this.username) return false;
+        const message = {
+            type: "cursor",
+            cursor: { ...cursor, username: this.username }
+        };
+        if (this.isHost) return this.broadcastMessage(message) > 0;
+        const host = this.getHostUsername();
+        return host ? this.sendRTC(host, message) : false;
+    }
+
+    reportStatus(message) {
+        for (const listener of this.statusListeners) {
+            listener(message);
+        }
+    }
+
+    sendSync(diff) {
+        const id = crypto.randomUUID();
+        this.seenSyncIds.add(id);
+        const message = { type: "sync", id, diff };
+
+        if (this.isHost) {
+            return this.broadcastMessage(message) > 0;
+        }
+
+        const host = this.getHostUsername();
+        if (!host) {
+            console.error("Cannot send sync: host is unknown.");
+            return false;
+        }
+
+        return this.sendRTC(host, message);
     }
 
     /**
@@ -387,6 +481,37 @@ export default class LobbyManager {
     }
 
     handleRTCMessage(remoteUsername, message) {
+        if (message.type === "cursor") {
+            const cursor = { ...message.cursor, username: remoteUsername };
+            if (this.isHost) {
+                this.broadcastMessage({ type: "cursor", cursor }, remoteUsername);
+            }
+            if (this.isHost || remoteUsername === this.getHostUsername()) {
+                for (const listener of this.cursorListeners) listener(cursor);
+            }
+            return;
+        }
+        if (message.type === "sync-request") {
+            if (this.isHost) {
+                for (const listener of this.syncRequestListeners) {
+                    listener(remoteUsername);
+                }
+            }
+            return;
+        }
+
+        if (message.type === "sync") {
+            if (message.id && this.seenSyncIds.has(message.id)) return;
+            if (message.id) this.seenSyncIds.add(message.id);
+            if (this.isHost) {
+                this.applyIncomingSync(message.diff);
+                this.broadcastMessage(message, remoteUsername);
+            } else if (remoteUsername === this.getHostUsername()) {
+                this.applyIncomingSync(message.diff);
+            }
+            return;
+        }
+
         if (message.type !== "diff") return;
 
         if (this.isHost) {
@@ -402,16 +527,29 @@ export default class LobbyManager {
         this.applyIncomingDiff(message.diff, remoteUsername);
     }
 
-    broadcastDiff(diff, excludeUsername = null) {
+    applyIncomingSync(diff) {
+        for (const listener of this.syncListeners) {
+            try {
+                listener(diff);
+            } catch (error) {
+                console.error("Sync listener failed:", error);
+            }
+        }
+    }
+
+    broadcastMessage(message, excludeUsername = null) {
+        let sent = 0;
         for (const [username, peer] of this.rtcPeers) {
             if (username === excludeUsername) continue;
             if (peer.channel?.readyState !== "open") continue;
-
-            peer.channel.send(JSON.stringify({
-                type: "diff",
-                diff
-            }));
+            peer.channel.send(JSON.stringify(message));
+            sent++;
         }
+        return sent;
+    }
+
+    broadcastDiff(diff, excludeUsername = null) {
+        this.broadcastMessage({ type: "diff", diff }, excludeUsername);
     }
 
     sendRTC(remoteUsername, data) {
@@ -456,4 +594,3 @@ export default class LobbyManager {
         );
     }
 }
-

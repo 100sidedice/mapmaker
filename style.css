@@ -265,6 +265,32 @@ ul {
     border: 0.2rem solid #478683;
     color: #9dd4d4;
 }
+#note-browser-rooms {
+    gap: 0.5rem;
+}
+#note-browser-rooms textarea,
+#note-browser-rooms button {
+    box-sizing: border-box;
+    max-width: 100%;
+}
+#note-browser-rooms .room-control {
+    min-width: 0;
+}
+#note-room-log {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 4rem;
+    max-height: 9rem;
+    margin: 0;
+    padding: 0.5rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: #181922;
+    border: 0.15rem solid #676767;
+    color: #d1d1d1;
+    font: 0.75rem/1.35 monospace;
+}
 span {
     user-select: none;
 }
