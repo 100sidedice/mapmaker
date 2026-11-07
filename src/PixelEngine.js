@@ -31,7 +31,7 @@ export default class PixelEngine {
     }
 
     getFillAnimationBatchSize(index) {
-        return Math.max(1, Math.ceil(Math.exp(index / 8)));
+        return Math.max(1, Math.ceil((5+(index / 8))**1.05));
     }
 
     pauseFillModifiers() {

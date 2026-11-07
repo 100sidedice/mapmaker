@@ -645,6 +645,7 @@ export default class TileEngine {
         const startLocalY = ((y % 8) + 8) % 8;
         const startTile = startRegion?.tiles[startLocalY][startLocalX] ?? "";
         const targetType = Array.isArray(startTile) ? startTile[0] : "";
+        const selectionFill = this.config.alt;
 
         if (
             this.config.focus &&
@@ -653,7 +654,7 @@ export default class TileEngine {
             return;
         }
 
-        if (targetType === type && !this.config.alt) return;
+        if (targetType === type && !selectionFill) return;
 
         const queue = [[x, y]];
         const visited = new Set();
@@ -686,7 +687,7 @@ export default class TileEngine {
             let region = this.mapMaker.map[regionKey];
 
             if (!region) {
-                if (this.config.alt) continue;
+                if (selectionFill) continue;
 
                 region = {
                     tiles: Array.from({ length: 8 }, () => Array(8).fill("")),
@@ -697,7 +698,7 @@ export default class TileEngine {
             const tile = region.tiles[localY][localX];
             const currentType = Array.isArray(tile) ? tile[0] : "";
 
-            if (!this.config.alt) {
+            if (!selectionFill) {
                 if (currentType !== targetType) continue;
                 steps.push({ tileX, tileY, regionKey, region });
             } else {
@@ -734,7 +735,7 @@ export default class TileEngine {
                 const localX = ((tileX % 8) + 8) % 8;
                 const localY = ((tileY % 8) + 8) % 8;
                 this.queueRegion(regionKey, region.tiles);
-                if (this.config.alt) {
+                if (selectionFill) {
                     region.tiles[localY][localX][1] = "selected";
                 } else {
                     region.tiles[localY][localX] = [type, ""];
@@ -1284,10 +1285,6 @@ export default class TileEngine {
                     this.keyMap["Control"]["action"]();
                     this.keyMap["Alt"]["action"]();
                     this.keyMap["f"]["action"]();
-                    setTimeout(() => {
-                        this.keyMap["Control"]["release-action"]();
-                        this.keyMap["Alt"]["release-action"]();
-                    }, 100);
                 },
                 type: "tap"
             },
